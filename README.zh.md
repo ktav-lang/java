@@ -27,33 +27,83 @@ dependencies {
 }
 ```
 
+### 解析 —— 按类型读取字段
+
 ```java
 import lang.ktav.Ktav;
 import lang.ktav.Value;
 
-public class Example {
-    public static void main(String[] args) {
-        String src = """
-                service: web
-                port:i 8080
-                ratio:f 0.75
-                tls: true
-                tags: [
-                    prod
-                    eu-west-1
-                ]
-                db.host: primary.internal
-                db.timeout:i 30
-                """;
+String src = """
+        service: web
+        port:i 8080
+        ratio:f 0.75
+        tls: true
+        tags: [
+            prod
+            eu-west-1
+        ]
+        db.host: primary.internal
+        db.timeout:i 30
+        """;
 
-        Value cfg = Ktav.loads(src);
-        System.out.println(cfg);
+Value.Obj top = (Value.Obj) Ktav.loads(src);
 
-        String text = Ktav.dumps(cfg);
-        System.out.println(text);
-    }
+String  service = ((Value.Str)  top.entries().get("service")).value();
+long    port    = ((Value.Int)  top.entries().get("port")).toLong();
+double  ratio   = ((Value.Flt)  top.entries().get("ratio")).toDouble();
+boolean tls     = ((Value.Bool) top.entries().get("tls")).value();
+
+Value.Obj db    = (Value.Obj) top.entries().get("db");
+String dbHost   = ((Value.Str) db.entries().get("host")).value();
+long   dbTimeout = ((Value.Int) db.entries().get("timeout")).toLong();
+```
+
+### 遍历 —— 在 sealed `Value` 层级上分派
+
+```java
+for (var e : top.entries().entrySet()) {
+    if      (e.getValue() instanceof Value.Bool b) System.out.println(e.getKey() + " is bool=" + b.value());
+    else if (e.getValue() instanceof Value.Int  i) System.out.println(e.getKey() + " is int=" + i.text());
+    else if (e.getValue() instanceof Value.Arr  a) System.out.println(e.getKey() + " is array(" + a.items().size() + ")");
+    // ...Null / Flt / Str / Obj
 }
 ```
+
+JDK 21+ 上可用对 sealed type 的 `switch` 表达式。
+
+### 构建并渲染 —— 用代码搭建文档
+
+```java
+import java.util.LinkedHashMap;
+import java.util.List;
+
+LinkedHashMap<String, Value> upstream = new LinkedHashMap<>();
+upstream.put("host", new Value.Str("a.example"));
+upstream.put("port", Value.Int.of(1080));
+
+LinkedHashMap<String, Value> doc = new LinkedHashMap<>();
+doc.put("name",      new Value.Str("frontend"));
+doc.put("port",      Value.Int.of(8443));
+doc.put("tls",       Value.Bool.TRUE);
+doc.put("ratio",     Value.Flt.of(0.95));
+doc.put("upstreams", new Value.Arr(List.of(new Value.Obj(upstream))));
+doc.put("notes",     Value.Null.NULL);
+
+String text = Ktav.dumps(new Value.Obj(doc));
+// name: frontend
+// port:i 8443
+// tls: true
+// ratio:f 0.95
+// upstreams: [
+//     {
+//         host: a.example
+//         port:i 1080
+//     }
+// ]
+// notes: null
+```
+
+完整可运行示例:[`examples/basic`](examples/basic/src/main/java/examples/Basic.java)。
 
 ## API
 
