@@ -1,0 +1,9 @@
+[versions]
+jna = "5.15.0"
+jackson = "2.18.2"
+junit = "5.11.4"
+
+[libraries]
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
