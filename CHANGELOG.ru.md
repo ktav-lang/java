@@ -11,6 +11,22 @@
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.2 — 2026-04-26
+
+### Изменено
+
+- **Подхватили `ktav 0.1.4`** — untyped путь `parse() → Value` в
+  upstream Rust crate (тот, что использует `cabi`) теперь ~30%
+  быстрее на маленьких документах и ~13% на больших, благодаря
+  однострочной правке initial capacity для `Frame::Object` (4 → 8).
+  Каждый `Ktav.loads` получит ускорение прозрачно.
+
+Maven координаты: `io.github.ktav-lang:ktav:0.1.2`. Подключение:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.1.2")
+```
+
 ## 0.1.1 — Maven Central + правки по ревью
 
 Первая публикация в Maven Central как

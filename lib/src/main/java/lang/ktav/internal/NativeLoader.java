@@ -31,7 +31,7 @@ import java.util.Locale;
 public final class NativeLoader {
 
     /** Version of {@code ktav_cabi} this build expects. Bump per release. */
-    static final String LIB_VERSION = "0.1.1";
+    static final String LIB_VERSION = "0.1.2";
 
     private static final String RELEASE_BASE =
             "https://github.com/ktav-lang/java/releases/download/v";
