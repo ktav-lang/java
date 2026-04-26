@@ -121,7 +121,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Gradle build
-        run: ./gradlew :lib:jar :lib:sourcesJar :lib:javadocJar --no-daemon
+        # vanniktech maven-publish renames javadocJar to
+        # mavenPlainJavadocJar, so we either ask for that explicitly or
+        # let the publication-graph trigger the right task transitively.
+        run: ./gradlew :lib:jar :lib:sourcesJar :lib:mavenPlainJavadocJar --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
