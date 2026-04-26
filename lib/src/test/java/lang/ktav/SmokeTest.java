@@ -18,9 +18,9 @@ final class SmokeTest {
 
     @BeforeAll
     static void requireNativeLib() {
-        String env = System.getenv("KTAV_LIB_PATH");
-        assumeTrue(env != null && !env.isEmpty(),
-                "KTAV_LIB_PATH not set — skipping native smoke tests");
+        TestPaths.init();
+        assumeTrue(TestPaths.cabiBuilt(),
+                "cabi not built (" + TestPaths.CABI + ") — run `cargo build --release -p ktav-cabi`");
     }
 
     @Test

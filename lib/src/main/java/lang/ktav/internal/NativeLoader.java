@@ -26,7 +26,7 @@ import java.util.Locale;
  * at release time — a stale cache from an older library version triggers
  * a fresh download.
  */
-final class NativeLoader {
+public final class NativeLoader {
 
     /** Version of {@code ktav_cabi} this build expects. Bump per release. */
     static final String LIB_VERSION = "0.1.0";
@@ -37,7 +37,26 @@ final class NativeLoader {
     private NativeLoader() {
     }
 
-    static String resolve() {
+    /** Test hook — production users override via {@code KTAV_LIB_PATH}. */
+    private static String testOverride;
+
+    /**
+     * Pins the on-disk path the loader will dlopen. Must be called
+     * before the first ktav call. Intended for the test suite.
+     */
+    public static void setLibraryPath(String path) {
+        testOverride = path;
+    }
+
+    public static String resolve() {
+        if (testOverride != null && !testOverride.isEmpty()) {
+            Path p = Path.of(testOverride);
+            if (!Files.exists(p)) {
+                throw new IllegalStateException(
+                        "setLibraryPath(\"" + testOverride + "\"): file not found");
+            }
+            return p.toAbsolutePath().toString();
+        }
         String env = System.getenv("KTAV_LIB_PATH");
         if (env != null && !env.isEmpty()) {
             Path p = Path.of(env);

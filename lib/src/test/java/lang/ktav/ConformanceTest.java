@@ -19,33 +19,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class ConformanceTest {
 
-    private static Path specRoot() {
-        String env = System.getenv("KTAV_SPEC_ROOT");
-        if (env != null && !env.isEmpty()) {
-            return Path.of(env);
-        }
-        return Path.of(System.getProperty("user.dir")).getParent()
-                .resolve("spec").resolve("versions").resolve("0.1").resolve("tests");
-    }
-
-    private static boolean hasNative() {
-        String e = System.getenv("KTAV_LIB_PATH");
-        return e != null && !e.isEmpty();
+    static {
+        TestPaths.init();
     }
 
     @TestFactory
     Stream<DynamicTest> validFixtures() throws IOException {
-        if (!hasNative()) {
+        if (!TestPaths.cabiBuilt()) {
             return Stream.of(DynamicTest.dynamicTest(
-                    "skip: KTAV_LIB_PATH not set", () -> {
+                    "skip: cabi not built", () -> {
                     }));
         }
-        Path root = specRoot().resolve("valid");
-        if (!Files.exists(root)) {
+        if (!TestPaths.specPresent()) {
             return Stream.of(DynamicTest.dynamicTest(
-                    "skip: " + root + " missing", () -> {
+                    "skip: spec submodule missing", () -> {
                     }));
         }
+        Path root = TestPaths.SPEC.resolve("valid");
         return Files.walk(root)
                 .filter(Files::isRegularFile)
                 .filter(p -> p.toString().endsWith(".ktav"))
@@ -110,17 +100,17 @@ final class ConformanceTest {
 
     @TestFactory
     Stream<DynamicTest> invalidFixtures() throws IOException {
-        if (!hasNative()) {
+        if (!TestPaths.cabiBuilt()) {
             return Stream.of(DynamicTest.dynamicTest(
-                    "skip: KTAV_LIB_PATH not set", () -> {
+                    "skip: cabi not built", () -> {
                     }));
         }
-        Path root = specRoot().resolve("invalid");
-        if (!Files.exists(root)) {
+        if (!TestPaths.specPresent()) {
             return Stream.of(DynamicTest.dynamicTest(
-                    "skip: " + root + " missing", () -> {
+                    "skip: spec submodule missing", () -> {
                     }));
         }
+        Path root = TestPaths.SPEC.resolve("invalid");
         return Files.walk(root)
                 .filter(Files::isRegularFile)
                 .filter(p -> p.toString().endsWith(".ktav"))

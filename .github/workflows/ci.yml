@@ -15,9 +15,9 @@ env:
 
 jobs:
   # ------------------------------------------------------------------
-  # Build native library + run Rust lints + Java tests, all in one job
-  # per OS. The same cargo build produces the cdylib the JUnit tests
-  # point at via $KTAV_LIB_PATH.
+  # Build native library + run Java tests in one job per OS. The test
+  # suite hardcodes both paths (cabi at `target/release/...`, spec at
+  # `spec/versions/0.1/tests`) — no env wiring needed.
   # ------------------------------------------------------------------
   test:
     name: ${{ matrix.os }} / JDK ${{ matrix.jdk }}
@@ -46,20 +46,7 @@ jobs:
       - name: Build native library
         run: cargo build --release -p ktav-cabi
 
-      - name: Export KTAV_LIB_PATH (Linux)
-        if: runner.os == 'Linux'
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.so" >> $GITHUB_ENV
-      - name: Export KTAV_LIB_PATH (macOS)
-        if: runner.os == 'macOS'
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.dylib" >> $GITHUB_ENV
-      - name: Export KTAV_LIB_PATH (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/ktav_cabi.dll" >> $GITHUB_ENV
-
       - name: Gradle test
-        env:
-          KTAV_SPEC_ROOT: ${{ github.workspace }}/spec/versions/0.1/tests
         run: ./gradlew :lib:test --no-daemon --stacktrace
 
       - name: Upload test reports
