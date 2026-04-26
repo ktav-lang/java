@@ -162,5 +162,12 @@ macOS, `$XDG_CACHE_HOME` or `~/.cache` on Linux.
 
 MIT — see [LICENSE](LICENSE).
 
-Ktav spec: [ktav-lang/spec](https://github.com/ktav-lang/spec).
-Reference Rust crate: [ktav-lang/rust](https://github.com/ktav-lang/rust).
+## Other Ktav implementations
+
+- [`spec`](https://github.com/ktav-lang/spec) — specification + conformance suite
+- [`rust`](https://github.com/ktav-lang/rust) — reference Rust crate (`cargo add ktav`)
+- [`csharp`](https://github.com/ktav-lang/csharp) — C# / .NET (`dotnet add package Ktav`)
+- [`golang`](https://github.com/ktav-lang/golang) — Go (`go get github.com/ktav-lang/golang`)
+- [`js`](https://github.com/ktav-lang/js) — JS / TS (`npm install @ktav-lang/ktav`)
+- [`php`](https://github.com/ktav-lang/php) — PHP (`composer require ktav-lang/ktav`)
+- [`python`](https://github.com/ktav-lang/python) — Python (`pip install ktav`)
