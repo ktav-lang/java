@@ -79,7 +79,8 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :lib:jar :lib:sourcesJar :lib:javadocJar --no-daemon
+      # vanniktech maven-publish renames javadocJar → mavenPlainJavadocJar.
+      - run: ./gradlew :lib:jar :lib:sourcesJar :lib:mavenPlainJavadocJar --no-daemon
       - name: Upload JARs
         uses: actions/upload-artifact@v4
         with:
