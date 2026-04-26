@@ -11,6 +11,36 @@ This changelog tracks **binding releases**, not changes to the Ktav format
 itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.1 — Maven Central + review fixes
+
+First publication to Maven Central as
+`io.github.ktav-lang:ktav:0.1.1`. Pull via:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.1.1")
+```
+
+### Fixed
+
+- `Ktav.callNative` wraps the JNA `Memory` in try-with-resources so
+  the native buffer is released even if the FFI call throws (was
+  leaking until the next GC finalizer pass).
+- `Value.Obj` / `Value.Arr` defensive-copy in their compact
+  constructor and expose unmodifiable views — the records were
+  advertised as immutable but callers could mutate the entries map
+  / items list through the accessor.
+- `NativeLoader.download` now `fsync`s the body bytes through a
+  `WRITE`-opened `FileChannel` before the rename, eliminating a
+  cache-corruption window after crash.
+- `NativeLoader.testOverride` is `volatile` for safe publication
+  under JUnit parallel execution.
+- `ConformanceTest` closes the `Files.walk` stream via
+  try-with-resources before returning to `@TestFactory`, fixing a
+  directory-iterator handle leak (manifested as `FileSystemException`
+  on Windows).
+- `SmokeTest.roundTripSimpleDocument` now asserts every key it
+  inserts (`ratio`, `nested.inner` were silently unverified).
+
 ## 0.1.0 — first public release
 
 First release. Targets **Ktav format 0.1**.

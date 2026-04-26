@@ -10,6 +10,33 @@ MINOR 递增视为破坏性变更。
 本 changelog 跟踪 **绑定发布**,不覆盖 Ktav 格式自身的变更 ——
 后者见 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.1.1 —— Maven Central + 评审修复
+
+首次发布到 Maven Central:`io.github.ktav-lang:ktav:0.1.1`。
+依赖声明:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.1.1")
+```
+
+### 修复
+
+- `Ktav.callNative` 用 try-with-resources 包裹 JNA `Memory`
+  ——即使 FFI 调用抛出异常,native 缓冲也会被释放
+  (之前会泄漏到下一次 GC finalizer)。
+- `Value.Obj` / `Value.Arr` 在 compact 构造器中做防御性拷贝并
+  以不可变视图暴露 —— 这两个 record 自称不可变,但通过访问器
+  调用方可以变更内容。
+- `NativeLoader.download` 在 rename 之前通过 `WRITE` 打开的
+  `FileChannel` 对 body 字节执行 `fsync`,关闭崩溃后缓存损坏的窗口。
+- `NativeLoader.testOverride` 改为 `volatile`,
+  以确保 JUnit 并行执行下的可见性。
+- `ConformanceTest` 在交回 `@TestFactory` 之前通过 try-with-
+  resources 关闭 `Files.walk` 流,修复目录迭代器句柄泄漏
+  (在 Windows 上表现为 `FileSystemException`)。
+- `SmokeTest.roundTripSimpleDocument` 现在校验它写入的每个键
+  (`ratio`、`nested.inner` 原本未被断言)。
+
 ## 0.1.0 —— 首次公开发布
 
 首次发布。目标格式版本:**Ktav 0.1**。

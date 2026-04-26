@@ -11,6 +11,35 @@
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.1 — Maven Central + правки по ревью
+
+Первая публикация в Maven Central как
+`io.github.ktav-lang:ktav:0.1.1`. Подключение:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.1.1")
+```
+
+### Исправлено
+
+- `Ktav.callNative` оборачивает JNA `Memory` в try-with-resources —
+  native-буфер освобождается, даже если FFI-вызов бросит исключение
+  (раньше утечка до следующего GC finalizer).
+- `Value.Obj` / `Value.Arr` делают defensive copy в compact-
+  конструкторе и отдают неизменяемые view'ы — записи претендовали на
+  immutable, но через аксессор клиент мог мутировать содержимое.
+- `NativeLoader.download` `fsync`-ает байты тела через `WRITE`-
+  открытый `FileChannel` перед rename — закрыто окно повреждения
+  кеша после crash.
+- `NativeLoader.testOverride` — `volatile` для корректной видимости
+  при JUnit-параллелизации.
+- `ConformanceTest` закрывает `Files.walk`-стрим через try-with-
+  resources до возврата `@TestFactory` — фикс утечки directory-
+  iterator handle (на Windows проявлялось как `FileSystemException`).
+- `SmokeTest.roundTripSimpleDocument` теперь проверяет каждый ключ,
+  который кладёт во вход (`ratio`, `nested.inner` молча не
+  ассертились).
+
 ## 0.1.0 — первый публичный релиз
 
 Первый релиз. Цель — **формат Ktav 0.1**.
