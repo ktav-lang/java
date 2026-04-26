@@ -11,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,18 +38,15 @@ final class ConformanceTest {
                     }));
         }
         Path root = TestPaths.SPEC.resolve("valid");
-        return Files.walk(root)
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".ktav"))
-                .sorted()
+        return collectKtavFiles(root).stream()
                 .map(p -> DynamicTest.dynamicTest(
                         root.relativize(p).toString().replace('\\', '/'),
                         () -> runValid(p)));
     }
 
     private void runValid(Path ktavPath) throws IOException {
-        String base = ktavPath.toString();
-        Path oraclePath = Path.of(base.substring(0, base.length() - ".ktav".length()) + ".json");
+        Path oraclePath = ktavPath.resolveSibling(
+                ktavPath.getFileName().toString().replaceFirst("\\.ktav$", ".json"));
         byte[] src = Files.readAllBytes(ktavPath);
         byte[] oracle = Files.readAllBytes(oraclePath);
 
@@ -111,13 +110,25 @@ final class ConformanceTest {
                     }));
         }
         Path root = TestPaths.SPEC.resolve("invalid");
-        return Files.walk(root)
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".ktav"))
-                .sorted()
+        return collectKtavFiles(root).stream()
                 .map(p -> DynamicTest.dynamicTest(
                         root.relativize(p).toString().replace('\\', '/'),
                         () -> runInvalid(p)));
+    }
+
+    /**
+     * Walks {@code root} and materialises the .ktav fixture list. The
+     * Stream from {@link Files#walk} holds an open directory iterator;
+     * draining inside try-with-resources closes it before we hand the
+     * (now-detached) list back to JUnit.
+     */
+    private static List<Path> collectKtavFiles(Path root) throws IOException {
+        try (Stream<Path> walk = Files.walk(root)) {
+            return walk.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".ktav"))
+                    .sorted()
+                    .collect(Collectors.toList());
+        }
     }
 
     private void runInvalid(Path ktavPath) throws IOException {

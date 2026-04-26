@@ -73,41 +73,41 @@ public final class Ktav {
 
     private static byte[] callNative(NativeOp op, byte[] input) {
         NativeLib lib = NativeLib.get();
-        Memory srcMem = null;
-        Pointer srcPtr;
-        if (input.length == 0) {
-            srcPtr = Pointer.NULL;
-        } else {
-            srcMem = new Memory(input.length);
-            srcMem.write(0, input, 0, input.length);
-            srcPtr = srcMem;
-        }
 
-        PointerByReference outBuf = new PointerByReference();
-        LongByReference outLen = new LongByReference();
-        PointerByReference outErr = new PointerByReference();
-        LongByReference outErrLen = new LongByReference();
-
-        int rc = switch (op) {
-            case LOADS -> lib.ktav_loads(srcPtr, input.length,
-                    outBuf, outLen, outErr, outErrLen);
-            case DUMPS -> lib.ktav_dumps(srcPtr, input.length,
-                    outBuf, outLen, outErr, outErrLen);
-        };
-
-        if (srcMem != null) {
-            srcMem.close();
-        }
-
-        if (rc != 0) {
-            String msg = copyAndFree(lib, outErr.getValue(), outErrLen.getValue());
-            if (msg.isEmpty()) {
-                msg = "native call failed with code " + rc;
+        // try-with-resources releases the native buffer even if the JNA
+        // call throws — otherwise the Memory leaks until the next GC
+        // finalizer pass.
+        try (Memory srcMem = input.length == 0 ? null : new Memory(input.length)) {
+            Pointer srcPtr;
+            if (srcMem == null) {
+                srcPtr = Pointer.NULL;
+            } else {
+                srcMem.write(0, input, 0, input.length);
+                srcPtr = srcMem;
             }
-            throw new KtavException(msg);
-        }
 
-        return copyAndFreeBytes(lib, outBuf.getValue(), outLen.getValue());
+            PointerByReference outBuf = new PointerByReference();
+            LongByReference outLen = new LongByReference();
+            PointerByReference outErr = new PointerByReference();
+            LongByReference outErrLen = new LongByReference();
+
+            int rc = switch (op) {
+                case LOADS -> lib.ktav_loads(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
+                case DUMPS -> lib.ktav_dumps(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
+            };
+
+            if (rc != 0) {
+                String msg = copyAndFree(lib, outErr.getValue(), outErrLen.getValue());
+                if (msg.isEmpty()) {
+                    msg = "native call failed with code " + rc;
+                }
+                throw new KtavException(msg);
+            }
+
+            return copyAndFreeBytes(lib, outBuf.getValue(), outLen.getValue());
+        }
     }
 
     private static byte[] copyAndFreeBytes(NativeLib lib, Pointer ptr, long len) {

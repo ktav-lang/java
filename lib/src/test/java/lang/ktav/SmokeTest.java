@@ -74,6 +74,12 @@ final class SmokeTest {
         assertEquals(new Value.Int("42"), b.entries().get("count"));
         assertEquals(Value.Bool.TRUE, b.entries().get("flag"));
         assertEquals(Value.Null.NULL, b.entries().get("nothing"));
+
+        Value.Flt ratioBack = assertInstanceOf(Value.Flt.class, b.entries().get("ratio"));
+        assertEquals(0.5, ratioBack.toDouble());
+
+        Value.Obj nestedBack = assertInstanceOf(Value.Obj.class, b.entries().get("nested"));
+        assertEquals(new Value.Int("1"), nestedBack.entries().get("inner"));
     }
 
     @Test

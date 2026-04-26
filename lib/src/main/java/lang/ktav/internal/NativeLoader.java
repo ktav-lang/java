@@ -5,9 +5,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Locale;
 
@@ -37,8 +39,13 @@ public final class NativeLoader {
     private NativeLoader() {
     }
 
-    /** Test hook — production users override via {@code KTAV_LIB_PATH}. */
-    private static String testOverride;
+    /**
+     * Test hook — production users override via {@code KTAV_LIB_PATH}.
+     * Volatile because the writer (test setup thread) and reader (the
+     * thread first triggering the {@link NativeLib.Holder} static init)
+     * may differ when JUnit runs tests in parallel.
+     */
+    private static volatile String testOverride;
 
     /**
      * Pins the on-disk path the loader will dlopen. Must be called
@@ -162,6 +169,25 @@ public final class NativeLoader {
         if (resp.statusCode() != 200) {
             Files.deleteIfExists(tmp);
             throw new IOException("HTTP " + resp.statusCode() + " for " + url);
+        }
+
+        // Force the body bytes to the storage device before the rename.
+        // POSIX fsync(fd) and Windows FlushFileBuffers operate at the
+        // file/inode level — flushing every dirty page of the file —
+        // so a fresh handle works (the body bytes were written by the
+        // HTTP body handler's now-closed handle, but the page cache is
+        // keyed by file, not by fd).
+        //
+        // The channel must be opened for WRITE: on Windows
+        // FlushFileBuffers requires a writable handle. WRITE alone
+        // does not truncate.
+        //
+        // We do NOT fsync the parent directory after the rename, so the
+        // dentry itself is at the FS's mercy until the next writeback.
+        // For a self-healing cache (delete & re-download on bad dlopen)
+        // that's acceptable.
+        try (FileChannel ch = FileChannel.open(tmp, StandardOpenOption.WRITE)) {
+            ch.force(true);
         }
 
         try {

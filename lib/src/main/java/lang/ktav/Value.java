@@ -1,8 +1,10 @@
 package lang.ktav;
 
 import java.math.BigInteger;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -110,20 +112,31 @@ public sealed interface Value
         }
     }
 
-    /** Multi-line {@code [ ... ]} array. */
+    /**
+     * Multi-line {@code [ ... ]} array. The compact constructor copies
+     * the input into an unmodifiable list so the value is genuinely
+     * immutable — callers can pass any {@link List} without worrying
+     * about aliasing, and {@link #items()} cannot be mutated through.
+     */
     record Arr(List<Value> items) implements Value {
         public Arr {
             Objects.requireNonNull(items, "items");
+            items = List.copyOf(items);
         }
     }
 
     /**
      * Multi-line {@code { ... }} object. Key order is preserved on both
      * the parse and render paths — this is the top-level document shape.
+     *
+     * <p>The compact constructor copies the input into an unmodifiable
+     * map so the value is genuinely immutable. Iterating the original
+     * input map's order is preserved.
      */
-    record Obj(LinkedHashMap<String, Value> entries) implements Value {
+    record Obj(Map<String, Value> entries) implements Value {
         public Obj {
             Objects.requireNonNull(entries, "entries");
+            entries = Collections.unmodifiableMap(new LinkedHashMap<>(entries));
         }
     }
 }
