@@ -156,8 +156,8 @@ jobs:
           # (the ORG_GRADLE_PROJECT_ prefix is the standard pass-through).
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.OSSRH_PASSWORD }}
-          # Base64-encoded armored private key — vanniktech 0.30+ auto-
-          # detects base64 and decodes. Passphrase is empty (key was
+          # Armored ASCII private key (the literal `-----BEGIN PGP
+          # PRIVATE KEY BLOCK-----` block). Passphrase is empty (key was
           # generated with %no-protection), so no GPG_PASSPHRASE secret.
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
         run: ./gradlew :lib:publishAndReleaseToMavenCentral --no-configuration-cache --no-daemon
