@@ -4,7 +4,7 @@ plugins {
 
 allprojects {
     group = "io.github.ktav-lang"
-    version = "0.1.2"
+    version = "0.1.3"
 }
 
 subprojects {
