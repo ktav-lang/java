@@ -11,6 +11,14 @@ This changelog tracks **binding releases**, not changes to the Ktav format
 itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.3.0 — 2026-05-08
+
+### Changed
+
+- **Picked up `ktav 0.3.0`** — tracks ktav 0.3.0. Spec submodule synced
+  to `46d94a7` (tightened paren-string fixture handling).
+
+
 ## 0.2.0 — 2026-05-07
 
 ### Changed (breaking)
