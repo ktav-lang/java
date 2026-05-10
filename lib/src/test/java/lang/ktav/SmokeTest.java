@@ -102,9 +102,104 @@ final class SmokeTest {
     }
 
     @Test
-    void dumpsRejectsNonObjectTopLevel() {
-        Value arr = new Value.Arr(List.of(new Value.Str("x")));
-        assertThrows(KtavException.class, () -> Ktav.dumps(arr));
+    void dumpsRejectsScalarTopLevel() {
+        // Top-level Array is now valid (spec 0.1.1) — only bare scalars
+        // are still rejected by the native side.
+        assertThrows(KtavException.class, () -> Ktav.dumps(new Value.Str("just a string")));
+    }
+
+    @Test
+    void loadsTopLevelArrayBareScalars() {
+        // spec 0.1.1: first content line decides Object vs Array.
+        String src = """
+                alpha
+                beta
+                gamma
+                """;
+        Value v = Ktav.loads(src);
+        Value.Arr arr = assertInstanceOf(Value.Arr.class, v);
+        assertEquals(List.of(
+                new Value.Str("alpha"),
+                new Value.Str("beta"),
+                new Value.Str("gamma")), arr.items());
+    }
+
+    @Test
+    void loadsTopLevelArrayTypedItems() {
+        String src = """
+                :i 1
+                :i 2
+                :f 3.5
+                """;
+        Value v = Ktav.loads(src);
+        Value.Arr arr = assertInstanceOf(Value.Arr.class, v);
+        assertEquals(3, arr.items().size());
+        assertEquals(new Value.Int("1"), arr.items().get(0));
+        assertEquals(new Value.Int("2"), arr.items().get(1));
+        Value.Flt third = assertInstanceOf(Value.Flt.class, arr.items().get(2));
+        assertEquals(3.5, third.toDouble());
+    }
+
+    @Test
+    void roundTripTopLevelArray() {
+        Value.Arr arr = new Value.Arr(List.of(
+                new Value.Str("one"),
+                new Value.Str("two"),
+                Value.Int.of(3)));
+        String out = Ktav.dumps(arr);
+        assertNotNull(out);
+        Value back = Ktav.loads(out);
+        Value.Arr bArr = assertInstanceOf(Value.Arr.class, back);
+        assertEquals(3, bArr.items().size());
+        assertEquals(new Value.Str("one"), bArr.items().get(0));
+        assertEquals(new Value.Str("two"), bArr.items().get(1));
+        assertEquals(new Value.Int("3"), bArr.items().get(2));
+    }
+
+    @Test
+    void toStringForceStringsCoercesScalars() {
+        LinkedHashMap<String, Value> entries = new LinkedHashMap<>();
+        entries.put("count", Value.Int.of(42));
+        entries.put("ratio", Value.Flt.of(0.5));
+        entries.put("flag", Value.Bool.TRUE);
+        entries.put("nothing", Value.Null.NULL);
+        entries.put("name", new Value.Str("demo"));
+
+        String out = Ktav.toStringForceStrings(new Value.Obj(entries));
+        assertNotNull(out);
+
+        // Round-trip — every leaf scalar must come back as Value.Str.
+        Value back = Ktav.loads(out);
+        Value.Obj b = assertInstanceOf(Value.Obj.class, back);
+        assertInstanceOf(Value.Str.class, b.entries().get("count"));
+        assertInstanceOf(Value.Str.class, b.entries().get("ratio"));
+        assertInstanceOf(Value.Str.class, b.entries().get("flag"));
+        assertInstanceOf(Value.Str.class, b.entries().get("nothing"));
+        assertInstanceOf(Value.Str.class, b.entries().get("name"));
+
+        assertEquals(new Value.Str("42"), b.entries().get("count"));
+        assertEquals("true", ((Value.Str) b.entries().get("flag")).value());
+        assertEquals("null", ((Value.Str) b.entries().get("nothing")).value());
+        assertEquals("demo", ((Value.Str) b.entries().get("name")).value());
+    }
+
+    @Test
+    void toStringForceStringsAcceptsTopLevelArray() {
+        Value.Arr arr = new Value.Arr(List.of(
+                Value.Int.of(1),
+                Value.Bool.FALSE,
+                Value.Null.NULL));
+        String out = Ktav.toStringForceStrings(arr);
+        assertNotNull(out);
+        Value back = Ktav.loads(out);
+        Value.Arr bArr = assertInstanceOf(Value.Arr.class, back);
+        assertEquals(3, bArr.items().size());
+        for (Value item : bArr.items()) {
+            assertInstanceOf(Value.Str.class, item);
+        }
+        assertEquals("1", ((Value.Str) bArr.items().get(0)).value());
+        assertEquals("false", ((Value.Str) bArr.items().get(1)).value());
+        assertEquals("null", ((Value.Str) bArr.items().get(2)).value());
     }
 
     @Test

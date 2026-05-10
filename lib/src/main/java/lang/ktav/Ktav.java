@@ -45,8 +45,10 @@ public final class Ktav {
 
     /**
      * Render a {@link Value} back to Ktav text. The top-level value must
-     * be a {@link Value.Obj} — other shapes are rejected by the native
-     * side. Throws {@link KtavException} on render error.
+     * be a {@link Value.Obj} or {@link Value.Arr} — other shapes are
+     * rejected by the native side. Top-level arrays are supported as of
+     * spec 0.1.1 (binding 0.3.1). Throws {@link KtavException} on render
+     * error.
      */
     public static String dumps(Value value) {
         if (value == null) {
@@ -54,6 +56,33 @@ public final class Ktav {
         }
         byte[] input = WireJson.encode(value);
         byte[] output = callNative(NativeOp.DUMPS, input);
+        return new String(output, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Render a {@link Value} back to Ktav text with every leaf scalar
+     * coerced to a String. Typed integers ({@code :i}), typed floats
+     * ({@code :f}), booleans, and {@code null} are flattened to their
+     * textual form via the raw-marker ({@code ::}). Compounds (objects
+     * and arrays) preserve their structure; only leaf scalars are
+     * coerced. The output round-trips back through {@link #loads} as the
+     * same set of String scalars.
+     *
+     * <p>Useful for "everything is a string" dumps — e.g. for downstream
+     * consumers that don't understand typed markers, or for diff-friendly
+     * canonical text.
+     *
+     * <p>The top-level value must be a {@link Value.Obj} or
+     * {@link Value.Arr}. Throws {@link KtavException} on render error.
+     *
+     * @since 0.3.1
+     */
+    public static String toStringForceStrings(Value value) {
+        if (value == null) {
+            throw new NullPointerException("value");
+        }
+        byte[] input = WireJson.encode(value);
+        byte[] output = callNative(NativeOp.DUMPS_FORCE_STRINGS, input);
         return new String(output, StandardCharsets.UTF_8);
     }
 
@@ -68,7 +97,8 @@ public final class Ktav {
 
     private enum NativeOp {
         LOADS,
-        DUMPS
+        DUMPS,
+        DUMPS_FORCE_STRINGS
     }
 
     private static byte[] callNative(NativeOp op, byte[] input) {
@@ -95,6 +125,8 @@ public final class Ktav {
                 case LOADS -> lib.ktav_loads(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
                 case DUMPS -> lib.ktav_dumps(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
+                case DUMPS_FORCE_STRINGS -> lib.ktav_dumps_force_strings(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
             };
 

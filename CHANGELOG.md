@@ -11,6 +11,34 @@ This changelog tracks **binding releases**, not changes to the Ktav format
 itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.3.1 — 2026-05-10
+
+### Added
+
+- **Top-level Array support** (spec § 5.0.1, ktav 0.3.1) — first
+  content line decides Object vs Array. `Ktav.loads` now returns
+  `Value.Arr` when the document begins with array-item shapes (bare
+  scalars, typed/raw markers, lone openers, multi-line openers); all
+  prior 0.3.0-valid documents still parse to the same `Value`.
+  `Ktav.dumps` accepts a `Value.Arr` at the top level as well.
+- **`Ktav.toStringForceStrings(Value)`** — render any Value with every
+  leaf scalar (typed integers `:i`, typed floats `:f`, booleans, and
+  `null`) coerced to a String via the raw marker (`::`). Compounds
+  preserve their structure. Useful for "everything is a string"
+  dumps. Round-trips back through `loads` as the same set of String
+  scalars.
+
+### Changed
+
+- **Picked up `ktav 0.3.1`** — tracks ktav 0.3.1 (additive). Spec
+  submodule synced to `7256816` (spec 0.1.1).
+
+### Native binary cache
+
+- `NativeLoader.LIB_VERSION` bumped to `0.3.1`. Fresh download from the
+  matching GitHub Release on first call after upgrade.
+
+
 ## 0.3.0 — 2026-05-08
 
 ### Changed
