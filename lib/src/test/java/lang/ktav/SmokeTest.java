@@ -25,17 +25,19 @@ final class SmokeTest {
 
     @Test
     void loadsBasicDocument() {
+        // spec 0.5.0: numbers, booleans, and null are inferred from lexical form.
+        // No :i / :f typed markers — bare integers and floats are parsed directly.
         String src = """
                 service: web
-                port:i 8080
-                ratio:f 0.75
+                port: 8080
+                ratio: 0.75
                 tls: true
                 tags: [
                     prod
                     eu-west-1
                 ]
                 db.host: primary
-                db.timeout:i 30
+                db.timeout: 30
                 """;
         Value v = Ktav.loads(src);
         Value.Obj top = assertInstanceOf(Value.Obj.class, v);
@@ -83,17 +85,19 @@ final class SmokeTest {
     }
 
     @Test
-    void arbitraryPrecisionIntegerRoundTrip() {
-        String huge = "99999999999999999999";
-        Value v = Ktav.loads("value:i " + huge);
-        Value.Obj top = (Value.Obj) v;
+    void largeIntegerRoundTrip() {
+        // spec 0.5.0: integers within i64 range are parsed as Integer.
+        // Values beyond i64 overflow to String (spec § 3.6.2).
+        String large = "9999999999";
+        Value v = Ktav.loads("value: " + large);
+        Value.Obj top = assertInstanceOf(Value.Obj.class, v);
         Value.Int i = assertInstanceOf(Value.Int.class, top.entries().get("value"));
-        assertEquals(new BigInteger(huge), i.toBigInteger());
+        assertEquals(new BigInteger(large), i.toBigInteger());
 
         LinkedHashMap<String, Value> m = new LinkedHashMap<>();
-        m.put("v", new Value.Int(huge));
+        m.put("v", new Value.Int(large));
         String out = Ktav.dumps(new Value.Obj(m));
-        assertTrue(out.contains(huge), "dump should carry big integer literally: " + out);
+        assertTrue(out.contains(large), "dump should carry integer literally: " + out);
     }
 
     @Test
@@ -126,10 +130,12 @@ final class SmokeTest {
 
     @Test
     void loadsTopLevelArrayTypedItems() {
+        // spec 0.5.0: bare integers and floats are inferred directly —
+        // no :i / :f typed markers needed.
         String src = """
-                :i 1
-                :i 2
-                :f 3.5
+                1
+                2
+                3.5
                 """;
         Value v = Ktav.loads(src);
         Value.Arr arr = assertInstanceOf(Value.Arr.class, v);

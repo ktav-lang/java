@@ -40,6 +40,14 @@ public interface NativeLib extends Library {
             PointerByReference outErr,
             LongByReference outErrLen);
 
+    int ktav_emit_canonical(
+            Pointer src,
+            long srcLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
     void ktav_free(Pointer ptr, long len);
 
     String ktav_version();

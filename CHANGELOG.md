@@ -11,6 +11,40 @@ This changelog tracks **binding releases**, not changes to the Ktav format
 itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.5.0 — 2026-05-27
+
+Implements Ktav spec 0.5.0. Tracks ktav-rust 0.5.0.
+
+### Breaking
+
+- Typed markers `:i` / `:f` removed. Numbers, booleans, and `null` are
+  inferred from the lexical form (spec §§ 3.6, 5.2). Write `key: 42` for
+  Integer, `key: 3.14` for Float, `key:: 42` to keep a String.
+- Comments now use `##` (own line). A single `#` byte is content, not a
+  comment.
+- Bare integers and floats no longer parse as String — `port: 8080` yields
+  `Value.Int("8080")`, not `Value.Str("8080")`.
+- Lone `{` / `[` on the first content line opens a multi-line root Object /
+  Array; the 0.1.1 JSONL-style semantic is removed.
+- Key segments are trimmed of leading/trailing whitespace.
+
+### Added
+
+- **Inline compounds** `{k: v, …}` / `[i, …]` (spec § 5.8) with trailing
+  comma, mid-value brace literal (§ 5.8.5), and nesting depth limit of 128.
+- **Eight escape sequences** in inline scalars: `\\`, `\,`, `\}`, `\]`,
+  `\{`, `\[`, `\n`, `\r` (spec § 3.7).
+- **`Ktav.emitCanonical(Value)`** — render a Value as the deterministic
+  canonical Ktav form (spec § 7), via the new `ktav_emit_canonical` C ABI
+  export.
+
+### Changed
+
+- License: MIT → MIT OR Apache-2.0 (`LICENSE-MIT` + `LICENSE-APACHE`).
+- Spec submodule: v0.5.0.
+- ktav-rust dependency: 0.5.0.
+- Conformance tests now run against `spec/versions/0.5/tests/`.
+
 ## 0.3.1 — 2026-05-10
 
 ### Added

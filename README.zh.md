@@ -160,7 +160,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 
 ## 许可证
 
-MIT —— 见 [LICENSE](LICENSE)。
+MIT OR Apache-2.0 —— 见 [LICENSE-MIT](LICENSE-MIT) 和 [LICENSE-APACHE](LICENSE-APACHE)。
 
 ## 其他 Ktav 实现
 

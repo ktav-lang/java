@@ -125,7 +125,8 @@ final class ConformanceTest {
     private static List<Path> collectKtavFiles(Path root) throws IOException {
         try (Stream<Path> walk = Files.walk(root)) {
             return walk.filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".ktav"))
+                    .filter(p -> p.toString().endsWith(".ktav")
+                            && !p.getFileName().toString().endsWith(".canonical.ktav"))
                     .sorted()
                     .collect(Collectors.toList());
         }

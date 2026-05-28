@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
  * model.
  *
  * <pre>{@code
- * Value doc = Ktav.loads("port :i= 8080\nname = app\n");
+ * Value doc = Ktav.loads("port: 8080\nname: app\n");
  * String text = Ktav.dumps(doc);
  * }</pre>
  *
@@ -61,12 +61,11 @@ public final class Ktav {
 
     /**
      * Render a {@link Value} back to Ktav text with every leaf scalar
-     * coerced to a String. Typed integers ({@code :i}), typed floats
-     * ({@code :f}), booleans, and {@code null} are flattened to their
-     * textual form via the raw-marker ({@code ::}). Compounds (objects
-     * and arrays) preserve their structure; only leaf scalars are
-     * coerced. The output round-trips back through {@link #loads} as the
-     * same set of String scalars.
+     * coerced to a String. Integers, floats, booleans, and {@code null}
+     * are flattened to their textual form via the raw-marker ({@code ::}).
+     * Compounds (objects and arrays) preserve their structure; only leaf
+     * scalars are coerced. The output round-trips back through
+     * {@link #loads} as the same set of String scalars.
      *
      * <p>Useful for "everything is a string" dumps — e.g. for downstream
      * consumers that don't understand typed markers, or for diff-friendly
@@ -87,6 +86,24 @@ public final class Ktav {
     }
 
     /**
+     * Render a {@link Value} as the deterministic canonical Ktav form
+     * (spec § 7). The output is stable across runs and can be used for
+     * hashing, diffing, or storage. The top-level value must be a
+     * {@link Value.Obj} or {@link Value.Arr}. Throws {@link KtavException}
+     * on render error.
+     *
+     * @since 0.5.0
+     */
+    public static String emitCanonical(Value value) {
+        if (value == null) {
+            throw new NullPointerException("value");
+        }
+        byte[] input = WireJson.encode(value);
+        byte[] output = callNative(NativeOp.EMIT_CANONICAL, input);
+        return new String(output, StandardCharsets.UTF_8);
+    }
+
+    /**
      * Version of the loaded {@code ktav_cabi} native library. Useful for
      * sanity checks.
      */
@@ -98,7 +115,8 @@ public final class Ktav {
     private enum NativeOp {
         LOADS,
         DUMPS,
-        DUMPS_FORCE_STRINGS
+        DUMPS_FORCE_STRINGS,
+        EMIT_CANONICAL
     }
 
     private static byte[] callNative(NativeOp op, byte[] input) {
@@ -127,6 +145,8 @@ public final class Ktav {
                 case DUMPS -> lib.ktav_dumps(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
                 case DUMPS_FORCE_STRINGS -> lib.ktav_dumps_force_strings(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
+                case EMIT_CANONICAL -> lib.ktav_emit_canonical(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
             };
 

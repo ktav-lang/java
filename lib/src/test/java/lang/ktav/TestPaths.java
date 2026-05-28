@@ -20,7 +20,7 @@ final class TestPaths {
     private static final Path REPO = Paths.get("..").toAbsolutePath().normalize();
 
     static final Path CABI = REPO.resolve("target").resolve("release").resolve(cabiName());
-    static final Path SPEC = REPO.resolve("spec").resolve("versions").resolve("0.1").resolve("tests");
+    static final Path SPEC = REPO.resolve("spec").resolve("versions").resolve("0.5").resolve("tests");
 
     static {
         if (Files.isRegularFile(CABI)) {
