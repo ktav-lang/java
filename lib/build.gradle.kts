@@ -73,6 +73,11 @@ mavenPublishing {
                 url.set("https://opensource.org/licenses/MIT")
                 distribution.set("repo")
             }
+            license {
+                name.set("Apache License 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                distribution.set("repo")
+            }
         }
         developers {
             developer {
