@@ -2,6 +2,8 @@
 
 **Languages:** [English](README.md) · **Русский** · [简体中文](README.zh.md)
 
+**Песочница:** конвертация JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
+
 Java-биндинги к [формату конфигурации Ktav](https://github.com/ktav-lang/spec).
 Тонкая обёртка над эталонным парсером на Rust, подгружаемая в runtime
 через [JNA](https://github.com/java-native-access/jna) — **никакой

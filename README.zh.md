@@ -2,6 +2,8 @@
 
 **Languages:** [English](README.md) · [Русский](README.ru.md) · **简体中文**
 
+**演练场：** 在浏览器中互转 JSON / YAML / TOML / INI ⇄ Ktav — **[ktav-lang.github.io](https://ktav-lang.github.io/)**。
+
 [Ktav 配置格式](https://github.com/ktav-lang/spec) 的 Java 绑定。
 在参考 Rust 解析器之上的一层薄封装,运行时通过
 [JNA](https://github.com/java-native-access/jna) 动态加载 ——

@@ -2,6 +2,8 @@
 
 **Languages:** **English** · [Русский](README.ru.md) · [简体中文](README.zh.md)
 
+**Playground:** convert JSON / YAML / TOML / INI ⇄ Ktav in your browser at **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
+
 Java bindings for the [Ktav configuration format](https://github.com/ktav-lang/spec).
 Thin wrapper around the reference Rust parser, loaded at runtime through
 [JNA](https://github.com/java-native-access/jna) — so **no JNI build on
