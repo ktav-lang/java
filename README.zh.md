@@ -22,7 +22,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.1.0")
+    implementation("io.github.ktav-lang:ktav:0.6.0")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
