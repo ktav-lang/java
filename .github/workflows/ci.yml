@@ -17,7 +17,7 @@ jobs:
   # ------------------------------------------------------------------
   # Build native library + run Java tests in one job per OS. The test
   # suite hardcodes both paths (cabi at `target/release/...`, spec at
-  # `spec/versions/0.1/tests`) — no env wiring needed.
+  # `spec/versions/0.6/tests`) — no env wiring needed.
   # ------------------------------------------------------------------
   test:
     name: ${{ matrix.os }} / JDK ${{ matrix.jdk }}

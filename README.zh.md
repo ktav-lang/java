@@ -42,15 +42,15 @@ import lang.ktav.Value;
 
 String src = """
         service: web
-        port:i 8080
-        ratio:f 0.75
+        port: 8080
+        ratio: 0.75
         tls: true
         tags: [
             prod
             eu-west-1
         ]
         db.host: primary.internal
-        db.timeout:i 30
+        db.timeout: 30
         """;
 
 Value.Obj top = (Value.Obj) Ktav.loads(src);
@@ -98,13 +98,13 @@ doc.put("notes",     Value.Null.NULL);
 
 String text = Ktav.dumps(new Value.Obj(doc));
 // name: frontend
-// port:i 8443
+// port: 8443
 // tls: true
-// ratio:f 0.95
+// ratio: 0.95
 // upstreams: [
 //     {
 //         host: a.example
-//         port:i 1080
+//         port: 1080
 //     }
 // ]
 // notes: null
@@ -132,13 +132,13 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | ---------------- | ------------------------------------------------------- |
 | `null`           | `Value.Null.NULL`                                       |
 | `true` / `false` | `Value.Bool`                                            |
-| `:i <digits>`    | `Value.Int`(文本形式 —— 任意精度,`toBigInteger()` / `toLong()`) |
-| `:f <number>`    | `Value.Flt`(文本形式 —— 精确往返,`toDouble()`) |
-| bare scalar      | `Value.Str`                                             |
+| 裸整数           | `Value.Int`(文本形式 —— 任意精度,`toBigInteger()` / `toLong()`) |
+| 裸小数           | `Value.Flt`(文本形式 —— 精确往返,`toDouble()`) |
+| 其他标量         | `Value.Str`                                             |
 | `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
 | `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`,保留插入顺序) |
 
-带类型的整数与浮点数以 **文本** 保存,从而任意精度
+整数与浮点数以 **文本** 保存,从而任意精度
 (超过 `long` 的位数)以及十进制的精确表示都能在 parse/render
 之间逐字节保持一致。
 

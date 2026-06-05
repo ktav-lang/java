@@ -43,15 +43,15 @@ import lang.ktav.Value;
 
 String src = """
         service: web
-        port:i 8080
-        ratio:f 0.75
+        port: 8080
+        ratio: 0.75
         tls: true
         tags: [
             prod
             eu-west-1
         ]
         db.host: primary.internal
-        db.timeout:i 30
+        db.timeout: 30
         """;
 
 Value.Obj top = (Value.Obj) Ktav.loads(src);
@@ -99,13 +99,13 @@ doc.put("notes",     Value.Null.NULL);
 
 String text = Ktav.dumps(new Value.Obj(doc));
 // name: frontend
-// port:i 8443
+// port: 8443
 // tls: true
-// ratio:f 0.95
+// ratio: 0.95
 // upstreams: [
 //     {
 //         host: a.example
-//         port:i 1080
+//         port: 1080
 //     }
 // ]
 // notes: null
@@ -133,13 +133,13 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | ---------------- | ------------------------------------------------------- |
 | `null`           | `Value.Null.NULL`                                       |
 | `true` / `false` | `Value.Bool`                                            |
-| `:i <digits>`    | `Value.Int` (текстовая форма — произвольная точность, `toBigInteger()` / `toLong()`) |
-| `:f <number>`    | `Value.Flt` (текстовая форма — точный round-trip, `toDouble()`) |
-| bare scalar      | `Value.Str`                                             |
+| голое целое      | `Value.Int` (текстовая форма — произвольная точность, `toBigInteger()` / `toLong()`) |
+| голое десятичное | `Value.Flt` (текстовая форма — точный round-trip, `toDouble()`) |
+| прочий скаляр    | `Value.Str`                                             |
 | `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
 | `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`, порядок вставки сохранён) |
 
-Типизированные целые и float хранятся **как текст**, чтобы произвольная
+Целые и float хранятся **как текст**, чтобы произвольная
 точность (цифры сверх `long`) и точное представление десятичного числа
 побайтово сохранялись между циклами parse/render.
 
