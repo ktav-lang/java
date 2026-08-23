@@ -44,6 +44,22 @@ public final class Ktav {
     }
 
     /**
+     * Parse a Ktav document with strict numeric spelling checks.
+     *
+     * @param src Ktav source text
+     * @return decoded value tree
+     * @throws KtavException when strict parsing rejects the source
+     */
+    public static Value loadsStrict(String src) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        byte[] input = src.getBytes(StandardCharsets.UTF_8);
+        byte[] output = callNative(NativeOp.LOADS_STRICT, input);
+        return WireJson.decode(output);
+    }
+
+    /**
      * Render a {@link Value} back to Ktav text. The top-level value must
      * be a {@link Value.Obj} or {@link Value.Arr} — other shapes are
      * rejected by the native side. Top-level arrays are supported as of
@@ -114,6 +130,7 @@ public final class Ktav {
 
     private enum NativeOp {
         LOADS,
+        LOADS_STRICT,
         DUMPS,
         DUMPS_FORCE_STRINGS,
         EMIT_CANONICAL
@@ -141,6 +158,8 @@ public final class Ktav {
 
             int rc = switch (op) {
                 case LOADS -> lib.ktav_loads(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
+                case LOADS_STRICT -> lib.ktav_loads_strict(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
                 case DUMPS -> lib.ktav_dumps(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);

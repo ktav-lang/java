@@ -24,6 +24,14 @@ public interface NativeLib extends Library {
             PointerByReference outErr,
             LongByReference outErrLen);
 
+    int ktav_loads_strict(
+            Pointer src,
+            long srcLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
     int ktav_dumps(
             Pointer src,
             long srcLen,

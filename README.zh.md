@@ -29,7 +29,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.6.0")
+    implementation("io.github.ktav-lang:ktav:0.6.4")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -117,6 +117,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | 函数 | 作用 |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | 将 Ktav 文档解析为 `Value` 树。 |
+| `Ktav.loadsStrict(String) -> Value` | 使用严格数字词法检查解析文档。 |
 | `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj`。 |
 | `Ktav.nativeVersion() -> String` | 已加载的 `ktav_cabi` 的版本字符串。 |
 
@@ -144,7 +145,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 
 ## 键的转义
 
-自 spec 0.6.0 起,键段内的字面量 `.` 或 `:` 通过反斜杠书写:
+自 spec 0.6.4 起,键段内的字面量 `.` 或 `:` 通过反斜杠书写:
 
 ```text
 a\.b: v        // 键是单个段 "a.b"        -> { "a.b": "v" }

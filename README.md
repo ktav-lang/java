@@ -29,7 +29,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.6.0")
+    implementation("io.github.ktav-lang:ktav:0.6.4")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -117,6 +117,7 @@ A complete runnable version lives in [`examples/basic`](examples/basic/src/main/
 | Function | Purpose |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Parse a Ktav document into the {@link Value} tree. |
+| `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
 | `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj`. |
 | `Ktav.nativeVersion() -> String` | Version string reported by the loaded `ktav_cabi`. |
 
@@ -144,7 +145,7 @@ for byte across parse/render cycles.
 
 ## Key escaping
 
-Since spec 0.6.0 a literal `.` or `:` inside a key segment is written
+Since spec 0.6.4 a literal `.` or `:` inside a key segment is written
 with a backslash:
 
 ```text

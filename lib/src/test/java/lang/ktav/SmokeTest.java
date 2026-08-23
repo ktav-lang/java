@@ -56,6 +56,16 @@ final class SmokeTest {
     }
 
     @Test
+    void loadsStrictChecksNumericSpelling() {
+        assertThrows(KtavException.class, () -> Ktav.loadsStrict("version: 1.10\n"));
+
+        Value v = Ktav.loadsStrict("small: 1e-3\nlarge: 1e10\n");
+        Value.Obj top = assertInstanceOf(Value.Obj.class, v);
+        assertEquals(new Value.Flt("0.001"), top.entries().get("small"));
+        assertEquals(new Value.Flt("10000000000.0"), top.entries().get("large"));
+    }
+
+    @Test
     void roundTripSimpleDocument() {
         LinkedHashMap<String, Value> entries = new LinkedHashMap<>();
         entries.put("name", new Value.Str("demo"));

@@ -19,11 +19,14 @@ final class TestPaths {
 
     private static final Path REPO = Paths.get("..").toAbsolutePath().normalize();
 
-    static final Path CABI = REPO.resolve("target").resolve("release").resolve(cabiName());
+    static final Path CABI = cabiPath();
     static final Path SPEC = REPO.resolve("spec").resolve("versions").resolve("0.6").resolve("tests");
 
     static {
-        if (Files.isRegularFile(CABI)) {
+        String override = System.getenv("KTAV_LIB_PATH");
+        if (override != null && !override.isEmpty()) {
+            NativeLoader.setLibraryPath(override);
+        } else if (Files.isRegularFile(CABI)) {
             NativeLoader.setLibraryPath(CABI.toString());
         }
     }
@@ -45,6 +48,14 @@ final class TestPaths {
         if (os.contains("win")) return "ktav_cabi.dll";
         if (os.contains("mac")) return "libktav_cabi.dylib";
         return "libktav_cabi.so";
+    }
+
+    private static Path cabiPath() {
+        String target = System.getenv("CARGO_TARGET_DIR");
+        Path base = target == null || target.isEmpty()
+                ? REPO.resolve("target")
+                : Paths.get(target);
+        return base.resolve("release").resolve(cabiName());
     }
 
     private TestPaths() {

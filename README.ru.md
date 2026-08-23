@@ -30,7 +30,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.6.0")
+    implementation("io.github.ktav-lang:ktav:0.6.4")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -118,6 +118,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | Функция | Назначение |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Разобрать Ktav-документ в дерево `Value`. |
+| `Ktav.loadsStrict(String) -> Value` | Разобрать документ со строгой проверкой записи чисел. |
 | `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj`. |
 | `Ktav.nativeVersion() -> String` | Версия подгруженного `ktav_cabi`. |
 
@@ -145,7 +146,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 
 ## Экранирование в ключах
 
-Начиная со spec 0.6.0 литеральные `.` или `:` внутри сегмента ключа
+Начиная со spec 0.6.4 литеральные `.` или `:` внутри сегмента ключа
 записываются через backslash:
 
 ```text
