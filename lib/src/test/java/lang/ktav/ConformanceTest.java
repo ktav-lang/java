@@ -7,6 +7,10 @@ import org.junit.jupiter.api.TestFactory;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -133,8 +137,27 @@ final class ConformanceTest {
     }
 
     private void runInvalid(Path ktavPath) throws IOException {
-        String src = Files.readString(ktavPath, StandardCharsets.UTF_8);
+        byte[] raw = Files.readAllBytes(ktavPath);
+        try {
+            strictDecodeUtf8(raw);
+        } catch (CharacterCodingException e) {
+            // Spec §6.15 (InvalidUtf8): the fixture's raw bytes are not
+            // valid UTF-8. The Java API takes a String, so this input can
+            // never even reach the parser — strict decoding failing here
+            // IS the expected rejection, and the test passes at this
+            // boundary.
+            return;
+        }
+        String src = new String(raw, StandardCharsets.UTF_8);
         assertThrows(KtavException.class, () -> Ktav.loads(src),
                 "expected parse error for " + ktavPath);
+    }
+
+    /** Strict UTF-8 decode: fails on malformed or unmappable input. */
+    private static void strictDecodeUtf8(byte[] bytes) throws CharacterCodingException {
+        CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT);
+        decoder.decode(ByteBuffer.wrap(bytes));
     }
 }
