@@ -11,6 +11,18 @@ This changelog tracks **binding releases**, not changes to the Ktav format
 itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## Unreleased
+
+### Changed
+
+- Tracks `ktav 0.7.0` and spec 0.7.0; the spec submodule is pinned to
+  `v0.7.0`.
+- `rust-version` raised to `1.71` (the ktav 0.7 MSRV).
+- Conformance tests now run the spec 0.7 corpus; invalid fixtures whose
+  raw bytes are not valid UTF-8 (§ 6.15) are rejected at the strict-UTF-8
+  test boundary, since the Java API takes a `String` and cannot receive
+  such input.
+
 ## 0.6.4 — 2026-08-23
 
 ### Added

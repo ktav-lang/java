@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### 变更
+
+- 跟踪 `ktav 0.7.0` 与 spec 0.7.0;spec 子模块固定在 `v0.7.0`。
+- `rust-version` 提升至 `1.71`（ktav 0.7 的 MSRV）。
+- 一致性测试现在运行 spec 0.7 语料库；原始字节不是有效 UTF-8 的
+  invalid fixture（§ 6.15）在测试边界通过严格 UTF-8 解码予以拒绝 ——
+  Java API 接收 `String`，无法传入此类输入。
+
 ## 0.6.4 —— 2026-08-23
 
 ### 新增
