@@ -14,6 +14,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,6 +102,51 @@ final class ConformanceTest {
             return true;
         }
         return a.equals(b);
+    }
+
+    /**
+     * Spec § 5.9.10 / § 5.9.8: every valid fixture ships a
+     * {@code .canonical.ktav} companion holding the one spelling a
+     * conforming canonical writer must produce. This is the only check
+     * that compares {@link Ktav#emitCanonical} against the spec's own
+     * bytes rather than against a model of it — without it, the
+     * canonical writer is tested against nothing but itself.
+     */
+    @TestFactory
+    Stream<DynamicTest> canonicalFixtures() throws IOException {
+        if (!TestPaths.cabiBuilt()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: cabi not built", () -> {
+                    }));
+        }
+        if (!TestPaths.specPresent()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: spec submodule missing", () -> {
+                    }));
+        }
+        Path root = TestPaths.SPEC.resolve("valid");
+        return collectCanonicalFiles(root).stream()
+                .map(p -> DynamicTest.dynamicTest(
+                        root.relativize(p).toString().replace('\\', '/'),
+                        () -> runCanonical(p)));
+    }
+
+    private void runCanonical(Path canonicalPath) throws IOException {
+        String name = canonicalPath.getFileName().toString();
+        Path srcPath = canonicalPath.resolveSibling(
+                name.substring(0, name.length() - ".canonical.ktav".length()) + ".ktav");
+        assertTrue(Files.isRegularFile(srcPath),
+                "canonical fixture " + canonicalPath + " has no source " + srcPath);
+        byte[] want = Files.readAllBytes(canonicalPath);
+        String src = new String(Files.readAllBytes(srcPath), StandardCharsets.UTF_8);
+
+        Value parsed = Ktav.loads(src);
+        byte[] got = Ktav.emitCanonical(parsed).getBytes(StandardCharsets.UTF_8);
+
+        assertTrue(Arrays.equals(want, got),
+                "canonical mismatch for " + srcPath
+                        + "\nwant: " + new String(want, StandardCharsets.UTF_8)
+                        + "\ngot:  " + new String(got, StandardCharsets.UTF_8));
     }
 
     @TestFactory
@@ -272,6 +318,16 @@ final class ConformanceTest {
             return walk.filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".ktav")
                             && !p.getFileName().toString().endsWith(".canonical.ktav"))
+                    .sorted()
+                    .collect(Collectors.toList());
+        }
+    }
+
+    /** Walks {@code root} and materialises the {@code .canonical.ktav} companion list. */
+    private static List<Path> collectCanonicalFiles(Path root) throws IOException {
+        try (Stream<Path> walk = Files.walk(root)) {
+            return walk.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".canonical.ktav"))
                     .sorted()
                     .collect(Collectors.toList());
         }

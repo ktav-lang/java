@@ -27,6 +27,11 @@ itself — for the latter see
   fixture values, canonical emit must refuse the parsed values, and the
   expected reason code must appear in the error message where this
   binding surfaces it.
+- The conformance runner now checks `emitCanonical` output against every
+  valid fixture's `.canonical.ktav` companion byte-for-byte (spec
+  § 5.9.10, § 5.9.8) — previously the canonical writer was only checked
+  for refusing unrepresentable values, never compared against the
+  spec's own canonical bytes.
 
 ## 0.6.4 — 2026-08-23
 

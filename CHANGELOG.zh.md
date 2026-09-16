@@ -13,6 +13,10 @@
   `parseable-unrepresentable/` 类别：写入方必须拒绝 fixture 值，规范
   输出必须拒绝解析后的值，并且在该 binding 能透出预期原因码的场合，
   错误消息必须包含它。
+- 一致性测试运行器现在会将 `emitCanonical` 的输出与每个 valid fixture
+  的 `.canonical.ktav` 伴随文件逐字节比对(spec § 5.9.10、§ 5.9.8)——
+  此前规范化 writer 只检查是否拒绝 unrepresentable 值,从未与 spec 自身
+  的规范字节做过比对。
 
 ## 0.6.4 —— 2026-08-23
 
