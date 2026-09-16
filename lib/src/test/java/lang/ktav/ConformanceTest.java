@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 final class ConformanceTest {
 
@@ -99,6 +101,145 @@ final class ConformanceTest {
             return true;
         }
         return a.equals(b);
+    }
+
+    @TestFactory
+    Stream<DynamicTest> unrepresentableFixtures() throws IOException {
+        if (!TestPaths.cabiBuilt()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: cabi not built", () -> {
+                    }));
+        }
+        if (!TestPaths.specPresent()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: spec submodule missing", () -> {
+                    }));
+        }
+        Path root = TestPaths.SPEC.resolve("unrepresentable");
+        if (!Files.isDirectory(root)) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "unrepresentable: category directory missing",
+                    () -> fail("category directory missing — runner must not silently pass an unknown/absent category")));
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            return walk.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".json"))
+                    .sorted()
+                    .map(p -> DynamicTest.dynamicTest(
+                            root.relativize(p).toString().replace('\\', '/'),
+                            () -> runUnrepresentable(p)))
+                    .collect(Collectors.toList())
+                    .stream();
+        }
+    }
+
+    private void runUnrepresentable(Path jsonPath) throws IOException {
+        byte[] oracle = Files.readAllBytes(jsonPath);
+        Value doc = WireJson.decode(oracle);
+        Value.Obj top = (Value.Obj) doc;
+        Value value = rewriteFloatMarkers(top.entries().get("value"));
+        String reason = ((Value.Str) top.entries().get("unrepresentable_reason")).value();
+
+        KtavException fromDumps = assertThrows(KtavException.class, () -> Ktav.dumps(value),
+                "dumps must refuse " + jsonPath);
+        KtavException fromCanonical = assertThrows(KtavException.class, () -> Ktav.emitCanonical(value),
+                "emitCanonical must refuse " + jsonPath);
+        if (reason.equals("ScalarRoot")) {
+            // scalar_root never reaches the crate: the binding's own cabi
+            // layer rejects non-Object/non-Array top-level values first,
+            // with its own message ("top-level Ktav document must be an
+            // object or array"). Refusal semantics are equivalent, only
+            // the message differs — so we must not assert "ScalarRoot".
+        } else {
+            // NonFiniteFloat: both writers go through the cabi JSON-wire
+            // input path, whose validate_float rejects the
+            // `{"$f":"NaN"}` payload earlier ("$f payload must contain
+            // '.' or exponent") — refusal semantics equivalent, the
+            // crate's reason code is not surfaced through this binding.
+            boolean surfacesReason = !reason.equals("NonFiniteFloat");
+            if (surfacesReason) {
+                assertTrue(fromDumps.getMessage().contains(reason),
+                        "dumps message for " + jsonPath + " lacks reason " + reason
+                                + ": " + fromDumps.getMessage());
+                assertTrue(fromCanonical.getMessage().contains(reason),
+                        "emitCanonical message for " + jsonPath + " lacks reason " + reason
+                                + ": " + fromCanonical.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Rewrites the fixture-only {@code {"$float": "..."}} encoding of
+     * non-finite floats into {@link Value.Flt}. WireJson decodes that
+     * shape as an ordinary single-entry Obj whose payload is a Str; an
+     * Obj with exactly one entry keyed {@code $float} whose value is a
+     * Str is therefore re-interpreted as a Float. Arrays and objects
+     * recurse; everything else is returned unchanged.
+     */
+    private static Value rewriteFloatMarkers(Value v) {
+        if (v instanceof Value.Obj o) {
+            if (o.entries().size() == 1) {
+                Map.Entry<String, Value> only = o.entries().entrySet().iterator().next();
+                if (only.getKey().equals("$float") && only.getValue() instanceof Value.Str s) {
+                    return new Value.Flt(s.value());
+                }
+            }
+            LinkedHashMap<String, Value> out = new LinkedHashMap<>();
+            o.entries().forEach((k, val) -> out.put(k, rewriteFloatMarkers(val)));
+            return new Value.Obj(out);
+        }
+        if (v instanceof Value.Arr a) {
+            return new Value.Arr(a.items().stream()
+                    .map(ConformanceTest::rewriteFloatMarkers)
+                    .collect(Collectors.toList()));
+        }
+        return v;
+    }
+
+    @TestFactory
+    Stream<DynamicTest> parseableUnrepresentableFixtures() throws IOException {
+        if (!TestPaths.cabiBuilt()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: cabi not built", () -> {
+                    }));
+        }
+        if (!TestPaths.specPresent()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: spec submodule missing", () -> {
+                    }));
+        }
+        Path root = TestPaths.SPEC.resolve("parseable-unrepresentable");
+        if (!Files.isDirectory(root)) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "parseable-unrepresentable: category directory missing",
+                    () -> fail("category directory missing — runner must not silently pass an unknown/absent category")));
+        }
+        return collectKtavFiles(root).stream()
+                .map(p -> DynamicTest.dynamicTest(
+                        root.relativize(p).toString().replace('\\', '/'),
+                        () -> runParseableUnrepresentable(p)));
+    }
+
+    private void runParseableUnrepresentable(Path ktavPath) throws IOException {
+        Path oraclePath = ktavPath.resolveSibling(
+                ktavPath.getFileName().toString().replaceFirst("\\.ktav$", ".json"));
+        String src = new String(Files.readAllBytes(ktavPath), StandardCharsets.UTF_8);
+        Value oracle = WireJson.decode(Files.readAllBytes(oraclePath));
+        Value want = rewriteFloatMarkers(((Value.Obj) oracle).entries().get("value"));
+        String reason = ((Value.Str) ((Value.Obj) oracle).entries()
+                .get("unrepresentable_reason")).value();
+
+        Value parsed = Ktav.loads(src);
+        assertTrue(valueEquals(want, parsed),
+                "parse mismatch for " + ktavPath + "\nsrc:\n" + src
+                        + "\nwant: " + want + "\ngot:  " + parsed);
+
+        KtavException fromCanonical = assertThrows(KtavException.class,
+                () -> Ktav.emitCanonical(parsed),
+                "emitCanonical must refuse " + ktavPath);
+        assertTrue(fromCanonical.getMessage().contains(reason),
+                "emitCanonical message for " + ktavPath + " lacks reason " + reason
+                        + ": " + fromCanonical.getMessage());
     }
 
     @TestFactory

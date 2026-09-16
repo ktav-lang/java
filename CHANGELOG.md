@@ -22,6 +22,11 @@ itself — for the latter see
   raw bytes are not valid UTF-8 (§ 6.15) are rejected at the strict-UTF-8
   test boundary, since the Java API takes a `String` and cannot receive
   such input.
+- The conformance runner now executes the spec 0.7 `unrepresentable/`
+  and `parseable-unrepresentable/` categories: writers must refuse the
+  fixture values, canonical emit must refuse the parsed values, and the
+  expected reason code must appear in the error message where this
+  binding surfaces it.
 
 ## 0.6.4 — 2026-08-23
 

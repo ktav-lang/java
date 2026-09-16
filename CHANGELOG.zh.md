@@ -9,6 +9,10 @@
 - 一致性测试现在运行 spec 0.7 语料库；原始字节不是有效 UTF-8 的
   invalid fixture（§ 6.15）在测试边界通过严格 UTF-8 解码予以拒绝 ——
   Java API 接收 `String`，无法传入此类输入。
+- 一致性测试运行器现在执行 spec 0.7 的 `unrepresentable/` 与
+  `parseable-unrepresentable/` 类别：写入方必须拒绝 fixture 值，规范
+  输出必须拒绝解析后的值，并且在该 binding 能透出预期原因码的场合，
+  错误消息必须包含它。
 
 ## 0.6.4 —— 2026-08-23
 
