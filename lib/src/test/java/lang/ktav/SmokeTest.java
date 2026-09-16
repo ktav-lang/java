@@ -219,6 +219,39 @@ final class SmokeTest {
     }
 
     @Test
+    void loadsQuotedKey() {
+        // spec § 5.3.3: quoted key segments. From the 0.7 corpus
+        // (valid/quoted_keys/double_quote_basic.*): `"a": 1` parses to
+        // {"a": 1}. And per valid/quoted_keys/dot_no_escape_needed.*,
+        // a quoted segment is NOT split on dots — `"a.b": 1` yields a
+        // single key "a.b", not a nested {a: {b: 1}}.
+        Value v = Ktav.loads("\"a.b\": 1\n");
+        Value.Obj top = assertInstanceOf(Value.Obj.class, v);
+        assertEquals(1, top.entries().size());
+        assertEquals(new Value.Int("1"), top.entries().get("a.b"));
+
+        Value v2 = Ktav.loads("\"a\": 1\n");
+        Value.Obj top2 = assertInstanceOf(Value.Obj.class, v2);
+        assertEquals(new Value.Int("1"), top2.entries().get("a"));
+    }
+
+    @Test
+    void loadsUnicodeEscapeInInlineValue() {
+        // spec § 3.7.1: unicode escape in an inline value. Verified
+        // against valid/inline/escape/lowercase_unicode_hex.*: lowercase
+        // hex accepted.
+        Value v = Ktav.loads("{key: \\" + "u00e9}");
+        Value.Obj top = assertInstanceOf(Value.Obj.class, v);
+        assertEquals(new Value.Str("é"), top.entries().get("key"));
+
+        // Uppercase hex must be accepted equally (§ 3.7.1 is
+        // case-insensitive on the hex digits).
+        Value v2 = Ktav.loads("{key: \\" + "u00C9}");
+        Value.Obj top2 = assertInstanceOf(Value.Obj.class, v2);
+        assertEquals(new Value.Str("É"), top2.entries().get("key"));
+    }
+
+    @Test
     void nativeVersionReportsSomething() {
         String v = Ktav.nativeVersion();
         assertNotNull(v);
