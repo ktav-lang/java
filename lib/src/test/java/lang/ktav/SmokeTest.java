@@ -10,6 +10,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -249,6 +250,65 @@ final class SmokeTest {
         Value v2 = Ktav.loads("{key: \\" + "u00C9}");
         Value.Obj top2 = assertInstanceOf(Value.Obj.class, v2);
         assertEquals(new Value.Str("É"), top2.entries().get("key"));
+    }
+
+    @Test
+    void formatPreservesCommentsAndIsFixedPoint() {
+        String src = """
+                # service configuration header
+                service: web
+
+
+                # nested tuning hint
+                db:
+                    timeout: 30
+                """ + "\n\n";
+        String once = Ktav.format(src);
+        assertTrue(once.contains("# service configuration header"),
+                "header comment must survive verbatim: " + once);
+        assertTrue(once.contains("# nested tuning hint"),
+                "comment before nested key must survive verbatim: " + once);
+        String twice = Ktav.format(once);
+        assertEquals(once, twice, "format must be a fixed point");
+    }
+
+    @Test
+    void formatMatchesCanonicalForTriviaFreeDocument() {
+        String src = """
+                service: web
+                port: 8080
+                db.host: primary
+                """;
+        assertEquals(Ktav.emitCanonical(Ktav.loads(src)), Ktav.format(src));
+    }
+
+    @Test
+    void errorSurfacesEnvelopeFieldsNotJustString() {
+        KtavException e = assertThrows(KtavException.class,
+                () -> Ktav.loads("a: ["));
+        assertEquals("UnclosedCompound", e.getError());
+        assertNull(e.getReason());
+        assertNotNull(e.getSpanStart());
+        assertNotNull(e.getSpanEnd());
+        String msg = e.getMessage();
+        assertNotNull(msg);
+        assertTrue(msg.contains("UnclosedCompound"),
+                "message must contain the error class: " + msg);
+        assertTrue(!msg.contains("{\"error\""),
+                "message must never be a raw JSON blob: " + msg);
+    }
+
+    @Test
+    void strictErrorCarriesCanonicalAndSpecFields() {
+        KtavException e = assertThrows(KtavException.class,
+                () -> Ktav.loadsStrict("version: 1.10\n"));
+        assertEquals("LossyScalar", e.getError());
+        assertEquals(1L, e.getLine());
+        assertEquals("version: 1.10", e.getLineText());
+        assertEquals("1.10", e.getBody());
+        assertEquals("1.1", e.getCanonical());
+        assertEquals("§3.6/§5.2", e.getSpecSection());
+        assertNull(e.getReason());
     }
 
     @Test

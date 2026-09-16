@@ -5,6 +5,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.ptr.LongByReference;
 import com.sun.jna.ptr.PointerByReference;
 
+import lang.ktav.internal.ErrorEnvelope;
 import lang.ktav.internal.NativeLib;
 import lang.ktav.internal.WireJson;
 
@@ -120,6 +121,37 @@ public final class Ktav {
     }
 
     /**
+     * Comment-preserving formatter. The input is Ktav SOURCE TEXT (like
+     * {@link #loads}), not a {@link Value} — unlike the render methods
+     * this round-trips through the document's own trivia.
+     *
+     * <p>Guarantees:
+     * <ul>
+     *   <li>Every comment is preserved verbatim (spec &sect; 3.4: a
+     *       comment owns a whole line).</li>
+     *   <li>Blank lines survive as grouping hints, but runs of 2+ blank
+     *       lines collapse to one, and blank padding immediately inside
+     *       brackets is dropped — hence the formatter is a fixed point:
+     *       {@code format(format(x)).equals(format(x))}.</li>
+     *   <li>Key order is never changed.</li>
+     *   <li>For documents with no comments and no blank lines the result
+     *       equals {@code emitCanonical(loads(src))}.</li>
+     * </ul>
+     *
+     * @param src Ktav source text
+     * @return formatted Ktav source text
+     * @throws KtavException when the native side rejects the source
+     */
+    public static String format(String src) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        byte[] input = src.getBytes(StandardCharsets.UTF_8);
+        byte[] output = callNative(NativeOp.FORMAT, input);
+        return new String(output, StandardCharsets.UTF_8);
+    }
+
+    /**
      * Version of the loaded {@code ktav_cabi} native library. Useful for
      * sanity checks.
      */
@@ -133,7 +165,8 @@ public final class Ktav {
         LOADS_STRICT,
         DUMPS,
         DUMPS_FORCE_STRINGS,
-        EMIT_CANONICAL
+        EMIT_CANONICAL,
+        FORMAT
     }
 
     private static byte[] callNative(NativeOp op, byte[] input) {
@@ -167,14 +200,16 @@ public final class Ktav {
                         outBuf, outLen, outErr, outErrLen);
                 case EMIT_CANONICAL -> lib.ktav_emit_canonical(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
+                case FORMAT -> lib.ktav_format(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
             };
 
             if (rc != 0) {
-                String msg = copyAndFree(lib, outErr.getValue(), outErrLen.getValue());
-                if (msg.isEmpty()) {
-                    msg = "native call failed with code " + rc;
+                byte[] payload = copyAndFreeBytes(lib, outErr.getValue(), outErrLen.getValue());
+                if (payload.length == 0) {
+                    throw new KtavException("native call failed with code " + rc);
                 }
-                throw new KtavException(msg);
+                throw KtavException.fromEnvelope(ErrorEnvelope.parse(payload));
             }
 
             return copyAndFreeBytes(lib, outBuf.getValue(), outLen.getValue());
@@ -188,11 +223,6 @@ public final class Ktav {
         byte[] out = ptr.getByteArray(0, toIntLen(len));
         lib.ktav_free(ptr, len);
         return out;
-    }
-
-    private static String copyAndFree(NativeLib lib, Pointer ptr, long len) {
-        byte[] b = copyAndFreeBytes(lib, ptr, len);
-        return new String(b, StandardCharsets.UTF_8);
     }
 
     private static int toIntLen(long len) {
