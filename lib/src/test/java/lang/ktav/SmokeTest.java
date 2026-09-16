@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -252,24 +253,56 @@ final class SmokeTest {
         assertEquals(new Value.Str("É"), top2.entries().get("key"));
     }
 
+    /**
+     * A Ktav comment is a line whose first non-whitespace characters are
+     * {@code ##} (spec § 3.4). A single {@code #} is ordinary content —
+     * there is a corpus fixture named {@code single_hash_is_literal} for
+     * exactly this. Writing the test with one {@code #} makes it vacuous:
+     * the first line then has no {@code ": "} separator, so § 5.0.1
+     * classifies the whole document as an Array root and every line
+     * becomes a string item, including {@code service: web}. A
+     * "comment survived" assertion would then pass because the text is a
+     * VALUE, and would keep passing if the formatter deleted every real
+     * comment.
+     */
     @Test
     void formatPreservesCommentsAndIsFixedPoint() {
         String src = """
-                # service configuration header
+                ## service configuration header
                 service: web
 
 
-                # nested tuning hint
-                db:
+                db: {
+                    ## nested tuning hint
                     timeout: 30
+                }
                 """ + "\n\n";
+
+        // The document really is an Object, not an Array of strings.
+        assertTrue(Ktav.loads(src) instanceof Value.Obj,
+                "test document must be an Object root, or the comment "
+                        + "assertions below prove nothing");
+
         String once = Ktav.format(src);
-        assertTrue(once.contains("# service configuration header"),
+
+        assertTrue(once.contains("## service configuration header"),
                 "header comment must survive verbatim: " + once);
-        assertTrue(once.contains("# nested tuning hint"),
-                "comment before nested key must survive verbatim: " + once);
-        String twice = Ktav.format(once);
-        assertEquals(once, twice, "format must be a fixed point");
+        assertTrue(once.contains("## nested tuning hint"),
+                "comment before a nested key must survive verbatim: " + once);
+
+        // Comments are trivia, not data: they must not appear in the
+        // parsed Value at all. This is what separates "preserved by the
+        // formatter" from "preserved because it was never a comment".
+        assertFalse(Ktav.dumps(Ktav.loads(once)).contains("##"),
+                "comments must not survive into the Value model");
+
+        // A run of blank lines collapses to exactly one, and trailing
+        // blank padding is dropped — the two rules that make the
+        // transform a fixed point.
+        assertFalse(once.contains("\n\n\n"),
+                "runs of blank lines must collapse to one: " + once);
+
+        assertEquals(once, Ktav.format(once), "format must be a fixed point");
     }
 
     @Test

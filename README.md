@@ -119,10 +119,73 @@ A complete runnable version lives in [`examples/basic`](examples/basic/src/main/
 | `Ktav.loads(String) -> Value` | Parse a Ktav document into the {@link Value} tree. |
 | `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
 | `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj`. |
+| `Ktav.format(String) -> String` | Normalise a document's spelling, keeping comments. |
 | `Ktav.nativeVersion() -> String` | Version string reported by the loaded `ktav_cabi`. |
 
-`KtavException` is thrown on any parse / render failure; the message is
-the UTF-8 string produced by the native parser.
+### Formatting
+
+`Ktav.format()` takes Ktav **source text** and returns Ktav source
+text — it is not a `Value` renderer. It normalises structure to
+canonical form (§ 5.9) while keeping the trivia the canonical writer
+drops:
+
+```java
+System.out.print(Ktav.format("## the server\nserver: {host: a, port: 80}\n"));
+// ## the server
+// server: {
+//     host: a
+//     port: 80
+// }
+```
+
+Every comment survives verbatim — Ktav has no trailing comments (§ 3.4:
+a comment owns a whole line), so attachment is unambiguous. Blank lines
+survive as a grouping hint, but a run of two or more collapses to
+exactly one and blank padding just inside a bracket is dropped, which
+makes the transform a fixed point: formatting already-formatted text
+changes nothing. Key order is never changed — canonical form has no
+sorting rule, and reordering keys would make review diffs worse.
+
+For a document with no comments **and no blank lines** the result
+equals `Ktav.emitCanonical(Ktav.loads(src))`. The stronger condition is
+deliberate: blank lines are no more part of the `Value` model than
+comments are, so the canonical writer drops them and `format` does not.
+
+### Errors
+
+`KtavException` is thrown on any parse or render failure. Beyond a
+human-readable `getMessage()`, it carries the nine structured fields of
+the core's error envelope:
+
+```java
+try {
+    Ktav.loadsStrict("version: 1.10\n");
+} catch (KtavException e) {
+    e.getError();        // "LossyScalar"
+    e.getLine();         // 1
+    e.getLineText();     // "version: 1.10"
+    e.getBody();         // "1.10"  — as written
+    e.getCanonical();    // "1.1"   — as it would be stored
+    e.getSpecSection();  // "§3.6/§5.2"
+}
+```
+
+The full set is `getError()`, `getReason()`, `getLine()`,
+`getLineText()`, `getSpanStart()`, `getSpanEnd()`, `getPath()`,
+`getBody()`, `getCanonical()`, `getSpecSection()`. Absent information
+is `null` — the boxed `Long` return types exist for exactly that
+reason — never a missing accessor, so any field can be read without
+first checking the error class.
+
+`getPath()` returns a `List<String>` of **exact decoded key segments,
+never a joined string**: a key literally named `a.b` is one segment and
+cannot be confused with a two-segment path.
+
+Two writer rejections are named apart — `"UnrepresentableAt"` when the
+writer can say which node is at fault (it fills `getPath()` too), and
+`"Unrepresentable"` when it cannot. The `reason` code is the same in
+both, so matching on `getReason()` is enough when you only need to know
+that a write was refused.
 
 ## Type mapping
 
