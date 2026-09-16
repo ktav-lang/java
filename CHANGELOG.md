@@ -32,6 +32,10 @@ itself — for the latter see
   § 5.9.10, § 5.9.8) — previously the canonical writer was only checked
   for refusing unrepresentable values, never compared against the
   spec's own canonical bytes.
+- The corpus-population guard now covers every fixture category (not
+  just `unrepresentable`/`parseable-unrepresentable`), asserts each is
+  non-empty, rejects an unknown fixture category directory, and asserts
+  `valid/` ships as many `.canonical.ktav` companions as fixtures.
 
 ## 0.6.4 — 2026-08-23
 

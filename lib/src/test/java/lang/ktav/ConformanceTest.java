@@ -19,6 +19,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -333,6 +334,16 @@ final class ConformanceTest {
         }
     }
 
+    /** Walks {@code root} and materialises the {@code .json} fixture list (unrepresentable). */
+    private static List<Path> collectJsonFiles(Path root) throws IOException {
+        try (Stream<Path> walk = Files.walk(root)) {
+            return walk.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".json"))
+                    .sorted()
+                    .collect(Collectors.toList());
+        }
+    }
+
     private void runInvalid(Path ktavPath) throws IOException {
         byte[] raw = Files.readAllBytes(ktavPath);
         try {
@@ -356,5 +367,77 @@ final class ConformanceTest {
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT);
         decoder.decode(ByteBuffer.wrap(bytes));
+    }
+
+    /**
+     * Corpus-population guard, covering every fixture category (not just
+     * the two newest, {@code unrepresentable} / {@code parseable-
+     * unrepresentable}, which already fail loudly via their own
+     * "category directory missing" dynamic test above). A category
+     * directory going missing, an unknown one silently appearing, or a
+     * category emptying out must all be loud failures — a
+     * {@link Files#walk} that yields zero paths would otherwise
+     * degenerate the corresponding {@code @TestFactory} into zero
+     * dynamic tests, which JUnit reports as nothing at all, not a
+     * failure.
+     *
+     * <p>NOTE: a shared fixture-category manifest is being designed in
+     * the spec repository to replace hand-rolled guards like this one —
+     * switch this over to that manifest once it exists, instead of the
+     * hardcoded whitelist below.
+     */
+    @TestFactory
+    Stream<DynamicTest> corpusIsFullyPopulated() {
+        if (!TestPaths.cabiBuilt()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: cabi not built", () -> {
+                    }));
+        }
+        if (!TestPaths.specPresent()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: spec submodule missing", () -> {
+                    }));
+        }
+        return Stream.of(DynamicTest.dynamicTest("guard", ConformanceTest::runCorpusGuard));
+    }
+
+    private static void runCorpusGuard() throws IOException {
+        Set<String> knownCategories = Set.of(
+                "valid", "invalid", "unrepresentable", "parseable-unrepresentable");
+
+        List<String> foundDirs;
+        try (Stream<Path> dirs = Files.list(TestPaths.SPEC)) {
+            foundDirs = dirs.filter(Files::isDirectory)
+                    .map(p -> p.getFileName().toString())
+                    .collect(Collectors.toList());
+        }
+        for (String name : foundDirs) {
+            assertTrue(knownCategories.contains(name),
+                    "unknown fixture category directory: " + name
+                            + " — runner must not silently ignore a new category");
+        }
+
+        for (String category : knownCategories) {
+            Path dir = TestPaths.SPEC.resolve(category);
+            assertTrue(Files.isDirectory(dir),
+                    "missing fixture category directory: " + category);
+        }
+
+        List<Path> valid = collectKtavFiles(TestPaths.SPEC.resolve("valid"));
+        List<Path> invalid = collectKtavFiles(TestPaths.SPEC.resolve("invalid"));
+        List<Path> unrepresentable = collectJsonFiles(TestPaths.SPEC.resolve("unrepresentable"));
+        List<Path> parseableUnrepresentable =
+                collectKtavFiles(TestPaths.SPEC.resolve("parseable-unrepresentable"));
+        List<Path> canonical = collectCanonicalFiles(TestPaths.SPEC.resolve("valid"));
+
+        assertTrue(!valid.isEmpty(), "no valid fixtures found");
+        assertTrue(!invalid.isEmpty(), "no invalid fixtures found");
+        assertTrue(!unrepresentable.isEmpty(), "no unrepresentable fixtures found");
+        assertTrue(!parseableUnrepresentable.isEmpty(), "no parseable-unrepresentable fixtures found");
+        assertTrue(!canonical.isEmpty(), "no canonical fixtures found");
+
+        assertTrue(valid.size() == canonical.size(),
+                "valid/ has " + valid.size() + " fixtures but " + canonical.size()
+                        + " .canonical.ktav companions — every valid leaf must ship one");
     }
 }

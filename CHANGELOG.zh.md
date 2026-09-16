@@ -17,6 +17,10 @@
   的 `.canonical.ktav` 伴随文件逐字节比对(spec § 5.9.10、§ 5.9.8)——
   此前规范化 writer 只检查是否拒绝 unrepresentable 值,从未与 spec 自身
   的规范字节做过比对。
+- 语料库填充度 guard 现在覆盖所有 fixture 类别(不再只是
+  `unrepresentable`/`parseable-unrepresentable`),断言每个类别非空,
+  拒绝未知的 fixture 类别目录,并断言 `valid/` 下 `.canonical.ktav`
+  伴随文件数量与 fixture 数量一致。
 
 ## 0.6.4 —— 2026-08-23
 
