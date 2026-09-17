@@ -5,7 +5,7 @@
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue?style=flat-square)
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
-**Languages:** [English](README.md) · **Русский** · [简体中文](README.zh.md)
+**Languages:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
 
 **Песочница:** конвертация JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
@@ -111,7 +111,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 // notes: null
 ```
 
-Полный запускаемый пример — в [`examples/basic`](examples/basic/src/main/java/examples/Basic.java).
+Полный запускаемый пример — в [`examples/basic`](../../examples/basic/src/main/java/examples/Basic.java).
 
 ## API
 
@@ -183,7 +183,7 @@ macOS, `$XDG_CACHE_HOME` или `~/.cache` на Linux.
 
 ## Лицензия
 
-MIT OR Apache-2.0 — см. [LICENSE-MIT](LICENSE-MIT) и [LICENSE-APACHE](LICENSE-APACHE).
+MIT OR Apache-2.0 — см. [LICENSE-MIT](../../LICENSE-MIT) и [LICENSE-APACHE](../../LICENSE-APACHE).
 
 ## Другие реализации Ktav
 
