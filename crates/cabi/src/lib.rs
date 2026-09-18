@@ -21,7 +21,7 @@
 //!
 //! ## C ABI
 //!
-//! Eight functions, all use the same "caller-owned pointer, callee-owned
+//! Nine functions, all use the same "caller-owned pointer, callee-owned
 //! buffer" pattern:
 //!
 //! - `ktav_loads(src, src_len, out_buf, out_len, out_err, out_err_len) -> i32`
@@ -30,13 +30,15 @@
 //! - `ktav_dumps_force_strings(src, src_len, out_buf, out_len, out_err, out_err_len) -> i32`
 //! - `ktav_emit_canonical(src, src_len, out_buf, out_len, out_err, out_err_len) -> i32`
 //! - `ktav_format(src, src_len, out_buf, out_len, out_err, out_err_len) -> i32`
+//! - `ktav_canonical_from_source(src, src_len, out_buf, out_len, out_err, out_err_len) -> i32`
 //! - `ktav_free(ptr, len)` — free a buffer returned by any of the above.
 //! - `ktav_version()` — NUL-terminated static string, for sanity checks.
 //!
 //! Return code: `0` on success, `1` on error. On error, `out_err` holds
 //! a JSON error envelope rendered by `ktav::ErrorEnvelope::to_json()`
-//! (nine fields, all present, `null` when absent) and must still be
-//! freed via `ktav_free`.
+//! (ten fields since ktav 0.7.2 — `message` was appended — all present,
+//! `null` when absent except `message`, which never is) and must still
+//! be freed via `ktav_free`.
 
 use std::os::raw::{c_char, c_int};
 use std::ptr;
@@ -346,6 +348,51 @@ pub unsafe extern "C" fn ktav_emit_canonical(
 ///
 /// # Safety
 /// Same as [`ktav_loads`].
+/// Parse Ktav source text and immediately re-emit it in canonical form
+/// (spec § 5.9), preserving the source's insertion order of object keys.
+/// Equivalent to `ktav_loads` piped into `ktav_emit_canonical`, but with
+/// no JSON `Value` in between: a scalar's exact spelling survives, where
+/// round-tripping through a host value can lose it (e.g. a host integer
+/// type that can't hold arbitrary precision).
+///
+/// # Safety
+/// Same as [`ktav_loads`].
+#[no_mangle]
+pub unsafe extern "C" fn ktav_canonical_from_source(
+    src: *const u8,
+    src_len: usize,
+    out_buf: *mut *mut u8,
+    out_len: *mut usize,
+    out_err: *mut *mut c_char,
+    out_err_len: *mut usize,
+) -> c_int {
+    *out_buf = ptr::null_mut();
+    *out_len = 0;
+    *out_err = ptr::null_mut();
+    *out_err_len = 0;
+
+    let text = match std::str::from_utf8(slice::from_raw_parts(src, src_len)) {
+        Ok(s) => s,
+        Err(e) => {
+            let err = ktav::Error::Message(format!("input is not valid UTF-8: {e}"));
+            return emit_err_envelope(&err, "", out_err, out_err_len);
+        }
+    };
+
+    let value = match ktav::parse(text) {
+        Ok(v) => v,
+        Err(e) => return emit_err_envelope(&e, text, out_err, out_err_len),
+    };
+
+    match ktav::emit_canonical(&value) {
+        Ok(canonical) => {
+            emit(canonical.into_bytes(), out_buf, out_len);
+            0
+        }
+        Err(e) => emit_err_envelope(&e, text, out_err, out_err_len),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn ktav_format(
     src: *const u8,
@@ -726,6 +773,22 @@ mod tests {
                 obj["reason"].is_null(),
                 "parse-time errors carry no reason code: {payload}"
             );
+        }
+    }
+
+    /// Task #303: proves the envelope this crate now emits (against the
+    /// 0.7.2 floor) carries `message` — added by rust#268/#269 so every
+    /// binding can stop reconstructing its own error text.
+    #[test]
+    fn envelope_carries_message_verbatim() {
+        unsafe {
+            let (rc, _out, err) = call_abi(ktav_format, b"a: [");
+            assert_eq!(rc, 1);
+            let payload = err.expect("error payload");
+            let v: Json = serde_json::from_str(&payload).expect("payload is JSON");
+            let obj = v.as_object().expect("envelope is an object");
+            let message = obj["message"].as_str().expect("message is a string");
+            assert!(!message.is_empty(), "message must never be empty: {payload}");
         }
     }
 }

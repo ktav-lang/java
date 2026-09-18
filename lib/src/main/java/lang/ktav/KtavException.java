@@ -8,11 +8,15 @@ import java.util.List;
  *
  * <p>Errors raised by the native side carry the structured error
  * envelope fields (see {@link lang.ktav.internal.ErrorEnvelope}) as
- * first-class members; {@link #getMessage()} is a human-readable
- * sentence reconstructed from those fields — never raw JSON. The
- * {@link #KtavException(String)} and {@link #KtavException(String,
- * Throwable)} constructors remain for purely internal errors that
- * never travel the envelope channel.
+ * first-class members; {@link #getMessage()} is the core's own
+ * rendering, taken verbatim from the envelope's {@code message} field —
+ * never raw JSON, and never reassembled from the other fields (a
+ * reassembled sentence would not match what every other Ktav binding
+ * prints for the same error). Against a native library built before
+ * ktav 0.7.2, which never wrote {@code message}, this falls back to a
+ * locally-built sentence. The {@link #KtavException(String)} and
+ * {@link #KtavException(String, Throwable)} constructors remain for
+ * purely internal errors that never travel the envelope channel.
  */
 public final class KtavException extends RuntimeException {
     private static final long serialVersionUID = 1L;
@@ -77,12 +81,21 @@ public final class KtavException extends RuntimeException {
 
     /**
      * Build a {@code KtavException} from a parsed native error envelope.
-     * The message is a single human-readable sentence assembled from the
-     * envelope fields — the raw JSON payload never reaches the user.
+     * The message is the core's own {@code message} field, taken
+     * verbatim — never rebuilt from the other fields, which was this
+     * binding's own reconstruction and produced text that didn't match
+     * any other language's rendering of the same error. Against a
+     * pre-0.7.2 native library, which never wrote {@code message}, this
+     * falls back to the old locally-assembled sentence so the exception
+     * still carries something readable.
      */
     public static KtavException fromEnvelope(
             lang.ktav.internal.ErrorEnvelope env) {
-        return new KtavException(describe(env),
+        String message = env.getMessage();
+        if (message == null) {
+            message = describe(env);
+        }
+        return new KtavException(message,
                 env.getError(), env.getReason(), env.getLine(),
                 env.getLineText(), env.getSpanStart(), env.getSpanEnd(),
                 env.getPath(), env.getBody(), env.getCanonical(),

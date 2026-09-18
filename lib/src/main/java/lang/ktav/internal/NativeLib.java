@@ -56,6 +56,14 @@ public interface NativeLib extends Library {
             PointerByReference outErr,
             LongByReference outErrLen);
 
+    int ktav_canonical_from_source(
+            Pointer src,
+            long srcLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
     int ktav_format(
             Pointer src,
             long srcLen,

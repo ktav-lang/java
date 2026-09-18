@@ -116,11 +116,20 @@ A complete runnable version lives in [`examples/basic`](examples/basic/src/main/
 
 | Function | Purpose |
 | --- | --- |
-| `Ktav.loads(String) -> Value` | Parse a Ktav document into the {@link Value} tree. |
+| `Ktav.loads(String) -> Value` | Parse a Ktav document into the `Value` tree. |
 | `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
 | `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj`. |
+| `Ktav.toStringForceStrings(Value) -> String` | Render like `dumps`, but coerce every leaf scalar to a String. |
+| `Ktav.emitCanonical(Value) -> String` | Render a `Value` as deterministic canonical form. |
 | `Ktav.format(String) -> String` | Normalise a document's spelling, keeping comments. |
+| `Ktav.canonicalFromSource(String) -> String` | Parse and re-emit as canonical Ktav in one call — `emitCanonical(loads(src))` with no intermediate `Value`. Drops comments and blank lines like `emitCanonical` does. |
 | `Ktav.nativeVersion() -> String` | Version string reported by the loaded `ktav_cabi`. |
+
+`toStringForceStrings` flattens integers, floats, booleans and `null` to
+their textual form via the raw marker (`::`); objects and arrays keep
+their structure, since only leaves are coerced. The result parses back
+through `loads` as the same set of String scalars — useful when a
+downstream consumer does not understand typed markers.
 
 ### Formatting
 
@@ -154,8 +163,11 @@ comments are, so the canonical writer drops them and `format` does not.
 ### Errors
 
 `KtavException` is thrown on any parse or render failure. Beyond a
-human-readable `getMessage()`, it carries the nine structured fields of
-the core's error envelope:
+human-readable `getMessage()`, it carries the nine other structured
+fields of the core's error envelope through ten accessors — `span` is
+split into `getSpanStart()` / `getSpanEnd()` rather than boxed into a
+pair type. `getMessage()` IS the envelope's own tenth field, `message`,
+taken verbatim — never reassembled from the other nine:
 
 ```java
 try {

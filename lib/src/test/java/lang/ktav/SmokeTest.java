@@ -325,8 +325,13 @@ final class SmokeTest {
         assertNotNull(e.getSpanEnd());
         String msg = e.getMessage();
         assertNotNull(msg);
-        assertTrue(msg.contains("UnclosedCompound"),
-                "message must contain the error class: " + msg);
+        // Since 0.7.2 this is the core's own Display rendering, taken
+        // verbatim (task #303) — not this binding's old reconstruction,
+        // which always embedded the PascalCase class name literally. The
+        // core's prose doesn't have to (and here doesn't): it says
+        // "Unclosed array" for `UnclosedCompound`, which is the more
+        // useful message, not a regression.
+        assertTrue(!msg.isBlank(), "message must be non-empty");
         assertTrue(!msg.contains("{\"error\""),
                 "message must never be a raw JSON blob: " + msg);
     }

@@ -119,10 +119,77 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | `Ktav.loads(String) -> Value` | 将 Ktav 文档解析为 `Value` 树。 |
 | `Ktav.loadsStrict(String) -> Value` | 使用严格数字词法检查解析文档。 |
 | `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj`。 |
+| `Ktav.toStringForceStrings(Value) -> String` | 输出与 `dumps` 相同，但把每个叶子标量强制为 String。 |
+| `Ktav.emitCanonical(Value) -> String` | 将 `Value` 渲染为确定性的规范形式。 |
+| `Ktav.format(String) -> String` | 规范化文档的写法，同时保留注释。 |
+| `Ktav.canonicalFromSource(String) -> String` | 一次调用完成解析并重新输出为规范 Ktav —— 相当于 `emitCanonical(loads(src))`,但中间没有 `Value`。像 `emitCanonical` 一样丢弃注释与空行。 |
 | `Ktav.nativeVersion() -> String` | 已加载的 `ktav_cabi` 的版本字符串。 |
 
-解析 / 渲染出错时抛出 `KtavException` —— 消息内容是由原生
-解析器返回的 UTF-8 字符串。
+`toStringForceStrings` 把整数、float、布尔与 `null` 用原始标记(`::`)
+压平为它们的文本形式；对象与数组保持自身结构，因为只有叶子会被强制。
+结果经由 `loads` 解析回来仍是同一组 String 标量 —— 当下游消费方不理解
+类型标记时，这很有用。
+
+### 格式化
+
+`Ktav.format()` 接受 Ktav **源文本**并返回 Ktav 源文本 —— 它不是
+`Value` 渲染器。它把结构规范化为规范形式（§ 5.9），同时保留规范
+writer 会丢弃的那部分附属内容：
+
+```java
+System.out.print(Ktav.format("## the server\nserver: {host: a, port: 80}\n"));
+// ## the server
+// server: {
+//     host: a
+//     port: 80
+// }
+```
+
+每条注释都逐字保留 —— Ktav 没有行尾注释（§ 3.4：注释独占一整行），
+因此归属毫无歧义。空行作为分组提示保留下来，但连续两行及以上会合并为
+恰好一行，紧贴括号内侧的空行填充会被丢弃，这正是该变换成为不动点的
+原因：对已格式化的文本再次格式化不会有任何改变。键顺序绝不改变 ——
+规范形式没有排序规则，而重排键只会让评审的 diff 更难读。
+
+对于既没有注释**也没有空行**的文档，结果等同于
+`Ktav.emitCanonical(Ktav.loads(src))`。这个更强的条件是有意的：空行
+与注释一样都不属于 `Value` 模型，所以规范 writer 会丢弃它们，而
+`format` 不会。
+
+### 错误
+
+解析或渲染失败时抛出 `KtavException`。除了人类可读的 `getMessage()`
+之外，它还通过十个访问器携带核心错误信封其余九个结构化字段 —— `span`
+被拆成 `getSpanStart()` / `getSpanEnd()`，而不是装进一个成对类型。
+`getMessage()` 正是信封的第十个字段 `message`，逐字取用，而不是从其余
+九个字段重新拼装出来的：
+
+```java
+try {
+    Ktav.loadsStrict("version: 1.10\n");
+} catch (KtavException e) {
+    e.getError();        // "LossyScalar"
+    e.getLine();         // 1
+    e.getLineText();     // "version: 1.10"
+    e.getBody();         // "1.10"  —— 按写法原样
+    e.getCanonical();    // "1.1"   —— 实际会被存储的形式
+    e.getSpecSection();  // "§3.6/§5.2"
+}
+```
+
+完整集合是 `getError()`、`getReason()`、`getLine()`、`getLineText()`、
+`getSpanStart()`、`getSpanEnd()`、`getPath()`、`getBody()`、
+`getCanonical()`、`getSpecSection()`。缺失的信息是 `null` —— 装箱的
+`Long` 返回类型正是为此而存在 —— 而不是缺少某个访问器，因此读取任何
+字段都无需先判断错误类别。
+
+`getPath()` 返回 `List<String>`，是**精确解码后的键段，绝不是拼接后的
+字符串**：字面名为 `a.b` 的键是**一个**段，不可能与两段路径混淆。
+
+writer 的两种拒绝被分开命名 —— 当 writer 能指出是哪个节点出错时用
+`"UnrepresentableAt"`（此时它也会填充 `getPath()`），不能指出时用
+`"Unrepresentable"`。两者的 `reason` 码相同，因此如果你只需要知道
+"这次写入被拒绝了"，匹配 `getReason()` 就够了。
 
 ## 类型映射
 

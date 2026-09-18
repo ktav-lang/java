@@ -13,8 +13,9 @@ import java.util.List;
  * {@code ktav_cabi} library into {@code out_err} on ANY error from any
  * ABI function.
  *
- * <p>Wire contract — exactly nine fields, always present in this order
- * (absent value = explicit JSON {@code null}):
+ * <p>Wire contract — since ktav 0.7.2, ten fields, always present in
+ * this order (absent value = explicit JSON {@code null}; {@code
+ * message} is never null — every error renders):
  * <pre>
  * {"error":&lt;string class name&gt;,
  *  "reason":&lt;string|null&gt;,
@@ -24,8 +25,14 @@ import java.util.List;
  *  "path":&lt;array of decoded key segments|null&gt;,
  *  "body":&lt;string|null&gt;,
  *  "canonical":&lt;string|null&gt;,
- *  "spec_section":&lt;string|null, like "&sect;6.1"&gt;}
+ *  "spec_section":&lt;string|null, like "&sect;6.1"&gt;,
+ *  "message":&lt;string, the core's own human-readable rendering&gt;}
  * </pre>
+ *
+ * <p>Against a pre-0.7.2 native library {@code message} is simply
+ * absent — {@link #getMessage()} returns {@code null} in that case, and
+ * {@link lang.ktav.KtavException#fromEnvelope} falls back to a locally
+ * reconstructed sentence.
  *
  * <p>{@code path} segments are the exact decoded keys: a key literally
  * named {@code "a.b"} is ONE segment, not two.
@@ -36,6 +43,12 @@ import java.util.List;
  * writes plain text), {@link #parse} returns a fallback envelope with
  * {@code error = "Message"} and {@code body} holding the raw payload —
  * it never throws.
+ *
+ * <p>Unknown field names are SKIPPED, not treated as a malformed
+ * payload. The envelope grows over time (0.7.2 appended {@code
+ * message}), and rejecting an unrecognised field would silently
+ * downgrade every structured error to the {@code "Message"} fallback
+ * against any newer core.
  */
 public final class ErrorEnvelope {
 
@@ -51,6 +64,7 @@ public final class ErrorEnvelope {
     private final String body;
     private final String canonical;
     private final String specSection;
+    private final String message;
 
     private ErrorEnvelope(
             String error,
@@ -62,7 +76,8 @@ public final class ErrorEnvelope {
             List<String> path,
             String body,
             String canonical,
-            String specSection) {
+            String specSection,
+            String message) {
         this.error = error;
         this.reason = reason;
         this.line = line;
@@ -73,6 +88,7 @@ public final class ErrorEnvelope {
         this.body = body;
         this.canonical = canonical;
         this.specSection = specSection;
+        this.message = message;
     }
 
     public String getError() {
@@ -116,6 +132,15 @@ public final class ErrorEnvelope {
     }
 
     /**
+     * The core's own human-readable rendering of the error, verbatim.
+     * {@code null} against a pre-0.7.2 native library, which never wrote
+     * this field.
+     */
+    public String getMessage() {
+        return message;
+    }
+
+    /**
      * Parse the raw {@code out_err} payload. Never throws — malformed or
      * non-JSON payloads degrade to a fallback envelope with
      * {@code error = "Message"} and the raw text as {@code body}.
@@ -136,6 +161,7 @@ public final class ErrorEnvelope {
             String body = null;
             String canonical = null;
             String specSection = null;
+            String message = null;
 
             JsonToken t;
             while ((t = p.nextToken()) != JsonToken.END_OBJECT) {
@@ -153,15 +179,27 @@ public final class ErrorEnvelope {
                         if (span == BAD) {
                             return fallback(raw);
                         }
-                        spanStart = span[0];
-                        spanEnd = span[1];
+                        // An explicit JSON null stays null. Boxing the
+                        // NULL_SPAN sentinel would surface -1 as a byte
+                        // offset and defeat the whole point of the boxed
+                        // Long return type.
+                        if (span != NULL_SPAN) {
+                            spanStart = span[0];
+                            spanEnd = span[1];
+                        }
                     }
                     case "path" -> path = readPath(p);
                     case "body" -> body = readString(p);
                     case "canonical" -> canonical = readString(p);
                     case "spec_section" -> specSection = readString(p);
+                    case "message" -> message = readString(p);
                     default -> {
-                        return fallback(raw);
+                        // Forward compatibility: skip fields a newer core
+                        // added. Discarding the whole envelope here made
+                        // EVERY structured error degrade to the "Message"
+                        // fallback as soon as 0.7.2 appended `message`.
+                        p.nextToken();
+                        p.skipChildren();
                     }
                 }
             }
@@ -169,7 +207,8 @@ public final class ErrorEnvelope {
                 return fallback(raw);
             }
             return new ErrorEnvelope(error, reason, line, lineText,
-                    spanStart, spanEnd, path, body, canonical, specSection);
+                    spanStart, spanEnd, path, body, canonical, specSection,
+                    message);
         } catch (Exception e) {
             return fallback(raw);
         }
@@ -177,7 +216,7 @@ public final class ErrorEnvelope {
 
     private static ErrorEnvelope fallback(String raw) {
         return new ErrorEnvelope("Message", null, null, null,
-                null, null, null, raw, null, null);
+                null, null, null, raw, null, null, null);
     }
 
     private static String readString(JsonParser p) throws java.io.IOException {

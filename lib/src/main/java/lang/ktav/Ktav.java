@@ -121,6 +121,32 @@ public final class Ktav {
     }
 
     /**
+     * Parse Ktav source text and immediately re-emit it in canonical
+     * form (spec &sect; 5.9), preserving the source's insertion order of
+     * object keys. Equivalent to {@code emitCanonical(loads(src))}, but
+     * in one native call instead of two: {@link Value.Int} and
+     * {@link Value.Flt} already store their text form verbatim
+     * (arbitrary precision, exact round-trip), so this binding has no
+     * float-fidelity gap either way — the win here is skipping the
+     * intermediate {@link Value} tree and its JSON wire encode/decode.
+     * Comments and blank lines do NOT survive — canonical form carries
+     * no trivia; use {@link #format} for that.
+     *
+     * @param src Ktav source text
+     * @return canonical Ktav source text
+     * @throws KtavException when the native side rejects the source
+     * @since 0.7.2
+     */
+    public static String canonicalFromSource(String src) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        byte[] input = src.getBytes(StandardCharsets.UTF_8);
+        byte[] output = callNative(NativeOp.CANONICAL_FROM_SOURCE, input);
+        return new String(output, StandardCharsets.UTF_8);
+    }
+
+    /**
      * Comment-preserving formatter. The input is Ktav SOURCE TEXT (like
      * {@link #loads}), not a {@link Value} — unlike the render methods
      * this round-trips through the document's own trivia.
@@ -166,7 +192,8 @@ public final class Ktav {
         DUMPS,
         DUMPS_FORCE_STRINGS,
         EMIT_CANONICAL,
-        FORMAT
+        FORMAT,
+        CANONICAL_FROM_SOURCE
     }
 
     private static byte[] callNative(NativeOp op, byte[] input) {
@@ -201,6 +228,8 @@ public final class Ktav {
                 case EMIT_CANONICAL -> lib.ktav_emit_canonical(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
                 case FORMAT -> lib.ktav_format(srcPtr, input.length,
+                        outBuf, outLen, outErr, outErrLen);
+                case CANONICAL_FROM_SOURCE -> lib.ktav_canonical_from_source(srcPtr, input.length,
                         outBuf, outLen, outErr, outErrLen);
             };
 
