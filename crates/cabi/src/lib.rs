@@ -788,7 +788,10 @@ mod tests {
             let v: Json = serde_json::from_str(&payload).expect("payload is JSON");
             let obj = v.as_object().expect("envelope is an object");
             let message = obj["message"].as_str().expect("message is a string");
-            assert!(!message.is_empty(), "message must never be empty: {payload}");
+            assert!(
+                !message.is_empty(),
+                "message must never be empty: {payload}"
+            );
         }
     }
 }
