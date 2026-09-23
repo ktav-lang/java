@@ -5,7 +5,7 @@
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue?style=flat-square)
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
-**Languages:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
+**Языки:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
 
 **Песочница:** конвертация JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
@@ -25,12 +25,12 @@ Java-биндинги к [формату конфигурации Ktav](https://
 ```kotlin
 repositories {
     mavenCentral()
-    // пока мы не в Maven Central, забирайте JAR из
-    // GitHub Release — пример см. в README.
+    // while we're not yet on Maven Central, consume the JAR from
+    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.6.4")
+    implementation("io.github.ktav-lang:ktav:0.8.0")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -179,8 +179,8 @@ try {
     e.getError();        // "LossyScalar"
     e.getLine();         // 1
     e.getLineText();     // "version: 1.10"
-    e.getBody();         // "1.10"  — как написано
-    e.getCanonical();    // "1.1"   — как было бы сохранено
+    e.getBody();         // "1.10"  — as written
+    e.getCanonical();    // "1.1"   — as it would be stored
     e.getSpecSection();  // "§3.6/§5.2"
 }
 ```
@@ -227,9 +227,9 @@ writer может указать виновный узел (тогда он за
 записываются через backslash:
 
 ```text
-a\.b: v        // ключ — один сегмент "a.b"     -> { "a.b": "v" }
-a\:b: v        // двоеточие внутри ключа        -> { "a:b": "v" }
-x.y\.z: v      // делим только по первой точке  -> { "x": { "y.z": "v" } }
+a\.b: v        // key is the single segment "a.b" -> { "a.b": "v" }
+a\:b: v        // key contains a colon            -> { "a:b": "v" }
+x.y\.z: v      // split on the first dot only     -> { "x": { "y.z": "v" } }
 ```
 
 Литеральный backslash в ключе пишется как `\\`.

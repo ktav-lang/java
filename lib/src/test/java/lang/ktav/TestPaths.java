@@ -20,7 +20,7 @@ final class TestPaths {
     private static final Path REPO = Paths.get("..").toAbsolutePath().normalize();
 
     static final Path CABI = cabiPath();
-    static final Path SPEC = REPO.resolve("spec").resolve("versions").resolve("0.7").resolve("tests");
+    static final Path SPEC = REPO.resolve("spec").resolve("versions").resolve("0.8").resolve("tests");
 
     static {
         String override = System.getenv("KTAV_LIB_PATH");

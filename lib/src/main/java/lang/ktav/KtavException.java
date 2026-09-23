@@ -13,7 +13,7 @@ import java.util.List;
  * never raw JSON, and never reassembled from the other fields (a
  * reassembled sentence would not match what every other Ktav binding
  * prints for the same error). Against a native library built before
- * ktav 0.7.2, which never wrote {@code message}, this falls back to a
+ * ktav 0.8.0, which never wrote {@code message}, this falls back to a
  * locally-built sentence. The {@link #KtavException(String)} and
  * {@link #KtavException(String, Throwable)} constructors remain for
  * purely internal errors that never travel the envelope channel.
@@ -85,7 +85,7 @@ public final class KtavException extends RuntimeException {
      * verbatim — never rebuilt from the other fields, which was this
      * binding's own reconstruction and produced text that didn't match
      * any other language's rendering of the same error. Against a
-     * pre-0.7.2 native library, which never wrote {@code message}, this
+     * pre-0.8.0 native library, which never wrote {@code message}, this
      * falls back to the old locally-assembled sentence so the exception
      * still carries something readable.
      */

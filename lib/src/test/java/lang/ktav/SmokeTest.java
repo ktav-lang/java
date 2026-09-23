@@ -325,7 +325,7 @@ final class SmokeTest {
         assertNotNull(e.getSpanEnd());
         String msg = e.getMessage();
         assertNotNull(msg);
-        // Since 0.7.2 this is the core's own Display rendering, taken
+        // Since 0.8.0 this is the core's own Display rendering, taken
         // verbatim (task #303) — not this binding's old reconstruction,
         // which always embedded the PascalCase class name literally. The
         // core's prose doesn't have to (and here doesn't): it says

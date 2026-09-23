@@ -47,3 +47,6 @@ Desktop.ini
 # Local-only cargo overrides (see switch_consumers_to_local_ktav.sh).
 # Committing one makes the crate unbuildable everywhere else.
 /.cargo/
+
+# Node (root-docs doc tooling)
+node_modules/

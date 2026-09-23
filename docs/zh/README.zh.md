@@ -24,12 +24,12 @@
 ```kotlin
 repositories {
     mavenCentral()
-    // 尚未发布到 Maven Central 之前,请直接从 GitHub Release
-    // 拉取 JAR —— README 中有完整示例。
+    // while we're not yet on Maven Central, consume the JAR from
+    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.6.4")
+    implementation("io.github.ktav-lang:ktav:0.8.0")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -171,8 +171,8 @@ try {
     e.getError();        // "LossyScalar"
     e.getLine();         // 1
     e.getLineText();     // "version: 1.10"
-    e.getBody();         // "1.10"  —— 按写法原样
-    e.getCanonical();    // "1.1"   —— 实际会被存储的形式
+    e.getBody();         // "1.10"  — as written
+    e.getCanonical();    // "1.1"   — as it would be stored
     e.getSpecSection();  // "§3.6/§5.2"
 }
 ```
@@ -215,9 +215,9 @@ writer 的两种拒绝被分开命名 —— 当 writer 能指出是哪个节点
 自 spec 0.6.4 起,键段内的字面量 `.` 或 `:` 通过反斜杠书写:
 
 ```text
-a\.b: v        // 键是单个段 "a.b"        -> { "a.b": "v" }
-a\:b: v        // 键中包含冒号            -> { "a:b": "v" }
-x.y\.z: v      // 只按第一个点切分        -> { "x": { "y.z": "v" } }
+a\.b: v        // key is the single segment "a.b" -> { "a.b": "v" }
+a\:b: v        // key contains a colon            -> { "a:b": "v" }
+x.y\.z: v      // split on the first dot only     -> { "x": { "y.z": "v" } }
 ```
 
 键中的字面量反斜杠写作 `\\`。

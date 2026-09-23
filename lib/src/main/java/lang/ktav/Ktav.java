@@ -135,7 +135,7 @@ public final class Ktav {
      * @param src Ktav source text
      * @return canonical Ktav source text
      * @throws KtavException when the native side rejects the source
-     * @since 0.7.2
+     * @since 0.8.0
      */
     public static String canonicalFromSource(String src) {
         if (src == null) {

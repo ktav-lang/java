@@ -85,6 +85,24 @@ itself — for the latter see
   requirement is `>=0.7.1, <0.8.0` — the floor rises, the ceiling stays
   inside 0.7.x.
 
+- Migrated `crates/cabi` to a single `ktav::declare_cabi!()` invocation
+  (ktav's `cabi` feature) instead of a hand-rolled C ABI shim; the
+  exported symbol surface is unchanged, so the Java API is unaffected.
+  Dependency floor raised to **0.8.0**, spec submodule re-pinned to
+  `v0.8.0` (adds § 5.2: a decimal with a redundant leading zero parses
+  as a String, not an Integer).
+- The artifact version moves to **0.8.0**, in step with the core and the
+  specification; the prebuilt-library download fallback now targets the
+  `v0.8.0` release asset.
+- The conformance runner reads `spec/versions/0.8/tests` (it silently
+  kept reading the stale `0.7` corpus after the submodule was re-pinned
+  to `0.8.0` — the path was hardcoded, not derived from the pin) and
+  executes every fixture category the corpus ships, including the new
+  `strict-lossy/` (`loads()` must equal the lax value, `loadsStrict()`
+  must throw with the matching reason, body and canonical form). A
+  guard test fails the build if an unrecognized category directory
+  appears under the corpus, so a future addition can't repeat this
+  silently.
 
 - Tracks `ktav 0.7.0` and spec 0.7.0; the spec submodule is pinned to
   `v0.7.0`.
@@ -212,14 +230,12 @@ Implements Ktav spec 0.5.0. Tracks ktav-rust 0.5.0.
 - `NativeLoader.LIB_VERSION` bumped to `0.3.1`. Fresh download from the
   matching GitHub Release on first call after upgrade.
 
-
 ## 0.3.0 — 2026-05-08
 
 ### Changed
 
 - **Picked up `ktav 0.3.0`** — tracks ktav 0.3.0. Spec submodule synced
   to `46d94a7` (tightened paren-string fixture handling).
-
 
 ## 0.2.0 — 2026-05-07
 
@@ -236,7 +252,6 @@ Implements Ktav spec 0.5.0. Tracks ktav-rust 0.5.0.
 ### Spec
 
 - spec submodule synced (typed_float_integer_body fixture; oracle 42.0).
-
 
 ## 0.1.3 — 2026-05-03
 

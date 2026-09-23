@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -289,6 +290,57 @@ final class ConformanceTest {
                         + ": " + fromCanonical.getMessage());
     }
 
+    /**
+     * Spec § 8.1 {@code strict-lossy/}: the lax entry point accepts the
+     * fixture and yields {@code lax_value}; the strict entry point rejects
+     * it with {@code LossyScalar} naming the oracle's exact body/canonical.
+     */
+    @TestFactory
+    Stream<DynamicTest> strictLossyFixtures() throws IOException {
+        if (!TestPaths.cabiBuilt()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: cabi not built", () -> {
+                    }));
+        }
+        if (!TestPaths.specPresent()) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "skip: spec submodule missing", () -> {
+                    }));
+        }
+        Path root = TestPaths.SPEC.resolve("strict-lossy");
+        if (!Files.isDirectory(root)) {
+            return Stream.of(DynamicTest.dynamicTest(
+                    "strict-lossy: category directory missing",
+                    () -> fail("category directory missing — runner must not silently pass an unknown/absent category")));
+        }
+        return collectKtavFiles(root).stream()
+                .map(p -> DynamicTest.dynamicTest(
+                        root.relativize(p).toString().replace('\\', '/'),
+                        () -> runStrictLossy(p)));
+    }
+
+    private void runStrictLossy(Path ktavPath) throws IOException {
+        Path oraclePath = ktavPath.resolveSibling(
+                ktavPath.getFileName().toString().replaceFirst("\\.ktav$", ".json"));
+        String src = new String(Files.readAllBytes(ktavPath), StandardCharsets.UTF_8);
+        Map<String, Value> oracle = ((Value.Obj) WireJson.decode(Files.readAllBytes(oraclePath))).entries();
+        Value want = oracle.get("lax_value");
+
+        Value lax = Ktav.loads(src);
+        assertTrue(valueEquals(want, lax),
+                "lax mismatch for " + ktavPath + "\nsrc:\n" + src
+                        + "\nwant: " + want + "\ngot:  " + lax);
+
+        KtavException e = assertThrows(KtavException.class, () -> Ktav.loadsStrict(src),
+                "loadsStrict must refuse " + ktavPath);
+        assertEquals(((Value.Str) oracle.get("expected_error")).value(), e.getError(),
+                "error class for " + ktavPath);
+        assertEquals(((Value.Str) oracle.get("body")).value(), e.getBody(),
+                "body for " + ktavPath);
+        assertEquals(((Value.Str) oracle.get("canonical")).value(), e.getCanonical(),
+                "canonical for " + ktavPath);
+    }
+
     @TestFactory
     Stream<DynamicTest> invalidFixtures() throws IOException {
         if (!TestPaths.cabiBuilt()) {
@@ -403,7 +455,7 @@ final class ConformanceTest {
 
     private static void runCorpusGuard() throws IOException {
         Set<String> knownCategories = Set.of(
-                "valid", "invalid", "unrepresentable", "parseable-unrepresentable");
+                "valid", "invalid", "unrepresentable", "parseable-unrepresentable", "strict-lossy");
 
         List<String> foundDirs;
         try (Stream<Path> dirs = Files.list(TestPaths.SPEC)) {
@@ -429,12 +481,14 @@ final class ConformanceTest {
         List<Path> parseableUnrepresentable =
                 collectKtavFiles(TestPaths.SPEC.resolve("parseable-unrepresentable"));
         List<Path> canonical = collectCanonicalFiles(TestPaths.SPEC.resolve("valid"));
+        List<Path> strictLossy = collectKtavFiles(TestPaths.SPEC.resolve("strict-lossy"));
 
         assertTrue(!valid.isEmpty(), "no valid fixtures found");
         assertTrue(!invalid.isEmpty(), "no invalid fixtures found");
         assertTrue(!unrepresentable.isEmpty(), "no unrepresentable fixtures found");
         assertTrue(!parseableUnrepresentable.isEmpty(), "no parseable-unrepresentable fixtures found");
         assertTrue(!canonical.isEmpty(), "no canonical fixtures found");
+        assertTrue(!strictLossy.isEmpty(), "no strict-lossy fixtures found");
 
         assertTrue(valid.size() == canonical.size(),
                 "valid/ has " + valid.size() + " fixtures but " + canonical.size()

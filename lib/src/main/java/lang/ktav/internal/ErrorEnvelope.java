@@ -13,7 +13,7 @@ import java.util.List;
  * {@code ktav_cabi} library into {@code out_err} on ANY error from any
  * ABI function.
  *
- * <p>Wire contract — since ktav 0.7.2, ten fields, always present in
+ * <p>Wire contract — since ktav 0.8.0, ten fields, always present in
  * this order (absent value = explicit JSON {@code null}; {@code
  * message} is never null — every error renders):
  * <pre>
@@ -29,7 +29,7 @@ import java.util.List;
  *  "message":&lt;string, the core's own human-readable rendering&gt;}
  * </pre>
  *
- * <p>Against a pre-0.7.2 native library {@code message} is simply
+ * <p>Against a pre-0.8.0 native library {@code message} is simply
  * absent — {@link #getMessage()} returns {@code null} in that case, and
  * {@link lang.ktav.KtavException#fromEnvelope} falls back to a locally
  * reconstructed sentence.
@@ -45,7 +45,7 @@ import java.util.List;
  * it never throws.
  *
  * <p>Unknown field names are SKIPPED, not treated as a malformed
- * payload. The envelope grows over time (0.7.2 appended {@code
+ * payload. The envelope grows over time (0.8.0 appended {@code
  * message}), and rejecting an unrecognised field would silently
  * downgrade every structured error to the {@code "Message"} fallback
  * against any newer core.
@@ -133,7 +133,7 @@ public final class ErrorEnvelope {
 
     /**
      * The core's own human-readable rendering of the error, verbatim.
-     * {@code null} against a pre-0.7.2 native library, which never wrote
+     * {@code null} against a pre-0.8.0 native library, which never wrote
      * this field.
      */
     public String getMessage() {
@@ -197,7 +197,7 @@ public final class ErrorEnvelope {
                         // Forward compatibility: skip fields a newer core
                         // added. Discarding the whole envelope here made
                         // EVERY structured error degrade to the "Message"
-                        // fallback as soon as 0.7.2 appended `message`.
+                        // fallback as soon as 0.8.0 appended `message`.
                         p.nextToken();
                         p.skipChildren();
                     }
