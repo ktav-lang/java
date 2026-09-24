@@ -69,14 +69,14 @@ MINOR 递增视为破坏性变更。
   `getError()` / `getReason()` —— 这正是本次改动的目的。
   `getMessage()` 保持人类可读，且永远不是原始 JSON。
 
-- 最低 `ktav` 核心版本提升至 **0.7.1**：`format_str` 与 `ErrorEnvelope`
-  在此之前不存在。用 Cargo 的话说，要求为 `>=0.7.1, <0.8.0` ——
-  下限抬高，上限仍留在 0.7.x 内。
+- **0.7.1 曾是 `format_str` 与 `ErrorEnvelope` 的中间最低版本**；本次
+  发布已将其取代。当前 `ktav` 要求的最低版本为 **0.8.0**，spec
+  子模块固定在 **v0.8.0**。
 
 - `crates/cabi` 改为单次调用 `ktav::declare_cabi!()`（ktav 的 `cabi`
   特性），取代手写的 C ABI 垫片；导出的符号集不变，因此 Java API
-  不受影响。依赖下限提升至 **0.8.0**，spec 子模块重新固定到 `v0.8.0`
-  （新增 § 5.2：带有多余前导零的十进制数解析为 String，而非 Integer）。
+  不受影响。0.8.0 依赖下限和 `v0.8.0` spec 固定版本带来 § 5.2：
+  带有多余前导零的十进制数解析为 String，而非 Integer。
 - 包版本升至 **0.8.0**，与核心和规范同步；预编译库的回退下载现在指向
   `v0.8.0` 发布资产。
 - Conformance 运行器读取 `spec/versions/0.8/tests`(子模块重新固定到

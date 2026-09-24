@@ -8,17 +8,17 @@
   the change. `getMessage()` remains human-readable and is never the
   raw JSON.
 
-- Minimum `ktav` core raised to **0.7.1**: `format_str` and
-  `ErrorEnvelope` do not exist before it. In Cargo terms the
-  requirement is `>=0.7.1, <0.8.0` — the floor rises, the ceiling stays
-  inside 0.7.x.
+- **0.7.1 was an intermediate minimum** for `format_str` and
+  `ErrorEnvelope`; it was superseded for this release. The current
+  `ktav` requirement has a **0.8.0** floor, and the spec submodule is
+  pinned to **v0.8.0**.
 
 - Migrated `crates/cabi` to a single `ktav::declare_cabi!()` invocation
   (ktav's `cabi` feature) instead of a hand-rolled C ABI shim; the
   exported symbol surface is unchanged, so the Java API is unaffected.
-  Dependency floor raised to **0.8.0**, spec submodule re-pinned to
-  `v0.8.0` (adds § 5.2: a decimal with a redundant leading zero parses
-  as a String, not an Integer).
+  The 0.8.0 dependency floor and `v0.8.0` spec pin add § 5.2: a decimal
+  with a redundant leading zero parses
+  as a String, not an Integer.
 - The artifact version moves to **0.8.0**, in step with the core and the
   specification; the prebuilt-library download fallback now targets the
   `v0.8.0` release asset.
@@ -42,17 +42,17 @@
   `getMessage()` остаётся человекочитаемым и никогда не является сырым
   JSON.
 
-- Минимальная версия ядра `ktav` поднята до **0.7.1**: `format_str` и
-  `ErrorEnvelope` не существуют до неё. В терминах Cargo требование —
-  `>=0.7.1, <0.8.0` — нижняя граница растёт, верхняя остаётся внутри
-  0.7.x.
+- **0.7.1 была промежуточной минимальной версией** для `format_str` и
+  `ErrorEnvelope`; для этого релиза она заменена. Текущее требование к
+  `ktav` имеет нижнюю границу **0.8.0**, а подмодуль spec закреплён на
+  **v0.8.0**.
 
 - `crates/cabi` переведён на один вызов `ktav::declare_cabi!()` (фича
   `cabi` крейта ktav) вместо рукописной C ABI-прослойки; набор
   экспортируемых символов не изменился, поэтому Java API не затронут.
-  Нижняя граница зависимости поднята до **0.8.0**, подмодуль spec
-  перезакреплён на `v0.8.0` (добавлен § 5.2: десятичное число с
-  избыточным ведущим нулём разбирается как String, а не Integer).
+  Нижняя граница зависимости **0.8.0** и закрепление spec на `v0.8.0`
+  добавляют § 5.2: десятичное число с избыточным ведущим нулём
+  разбирается как String, а не Integer.
 - Версия пакета — **0.8.0**, синхронно с ядром и спецификацией; резервная
   загрузка готовой библиотеки теперь берёт ассет релиза `v0.8.0`.
 - Conformance-раннер читает `spec/versions/0.8/tests` (после
@@ -73,14 +73,14 @@
   `getError()` / `getReason()` —— 这正是本次改动的目的。
   `getMessage()` 保持人类可读，且永远不是原始 JSON。
 
-- 最低 `ktav` 核心版本提升至 **0.7.1**：`format_str` 与 `ErrorEnvelope`
-  在此之前不存在。用 Cargo 的话说，要求为 `>=0.7.1, <0.8.0` ——
-  下限抬高，上限仍留在 0.7.x 内。
+- **0.7.1 曾是 `format_str` 与 `ErrorEnvelope` 的中间最低版本**；本次
+  发布已将其取代。当前 `ktav` 要求的最低版本为 **0.8.0**，spec
+  子模块固定在 **v0.8.0**。
 
 - `crates/cabi` 改为单次调用 `ktav::declare_cabi!()`（ktav 的 `cabi`
   特性），取代手写的 C ABI 垫片；导出的符号集不变，因此 Java API
-  不受影响。依赖下限提升至 **0.8.0**，spec 子模块重新固定到 `v0.8.0`
-  （新增 § 5.2：带有多余前导零的十进制数解析为 String，而非 Integer）。
+  不受影响。0.8.0 依赖下限和 `v0.8.0` spec 固定版本带来 § 5.2：
+  带有多余前导零的十进制数解析为 String，而非 Integer。
 - 包版本升至 **0.8.0**，与核心和规范同步；预编译库的回退下载现在指向
   `v0.8.0` 发布资产。
 - Conformance 运行器读取 `spec/versions/0.8/tests`(子模块重新固定到

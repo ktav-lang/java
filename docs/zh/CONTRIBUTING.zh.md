@@ -87,7 +87,7 @@ export KTAV_LIB_PATH="$PWD/target/release/libktav_cabi.so"   # Linux
 
 # 3. For conformance tests, point at the spec submodule.
 git submodule update --init
-export KTAV_SPEC_ROOT="$PWD/spec/versions/0.1/tests"
+export KTAV_SPEC_ROOT="$PWD/spec/versions/0.8/tests"
 ```
 
 ### 测试

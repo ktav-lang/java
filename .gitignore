@@ -6,6 +6,7 @@ Cargo.lock
 # Java / Gradle
 .gradle/
 build/
+!/root-docs/CONTRIBUTING/build/
 !gradle/wrapper/gradle-wrapper.jar
 out/
 bin/

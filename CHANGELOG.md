@@ -80,17 +80,17 @@ itself — for the latter see
   the change. `getMessage()` remains human-readable and is never the
   raw JSON.
 
-- Minimum `ktav` core raised to **0.7.1**: `format_str` and
-  `ErrorEnvelope` do not exist before it. In Cargo terms the
-  requirement is `>=0.7.1, <0.8.0` — the floor rises, the ceiling stays
-  inside 0.7.x.
+- **0.7.1 was an intermediate minimum** for `format_str` and
+  `ErrorEnvelope`; it was superseded for this release. The current
+  `ktav` requirement has a **0.8.0** floor, and the spec submodule is
+  pinned to **v0.8.0**.
 
 - Migrated `crates/cabi` to a single `ktav::declare_cabi!()` invocation
   (ktav's `cabi` feature) instead of a hand-rolled C ABI shim; the
   exported symbol surface is unchanged, so the Java API is unaffected.
-  Dependency floor raised to **0.8.0**, spec submodule re-pinned to
-  `v0.8.0` (adds § 5.2: a decimal with a redundant leading zero parses
-  as a String, not an Integer).
+  The 0.8.0 dependency floor and `v0.8.0` spec pin add § 5.2: a decimal
+  with a redundant leading zero parses
+  as a String, not an Integer.
 - The artifact version moves to **0.8.0**, in step with the core and the
   specification; the prebuilt-library download fallback now targets the
   `v0.8.0` release asset.
