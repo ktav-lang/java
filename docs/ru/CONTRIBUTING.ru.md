@@ -139,8 +139,12 @@ CI гоняет те же команды; прогоняйте их локаль
 платформенных бинарей (`linux` amd64/arm64, `darwin` amd64/arm64,
 `windows` amd64/arm64) плюс собирает библиотечный JAR — всё
 прикрепляется к GitHub Release. Константа `LIB_VERSION` в
-`NativeLoader.java` обязана совпадать с тегом — правьте в том же
-коммите, что и сообщение тега.
+`NativeLoader.java` обязана совпадать с тегом — правьте её в
+подготовительном коммите перед тегом.
+
+Тот же тег публикует JAR и в Maven Central как
+`io.github.ktav-lang:ktav` (Sonatype Central Portal, job `publish-maven`
+в `release.yml`).
 
 ## Философия
 

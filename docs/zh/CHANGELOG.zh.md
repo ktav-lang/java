@@ -12,6 +12,8 @@ MINOR 递增视为破坏性变更。
 
 ## Unreleased
 
+## 0.8.0 — 2026-09-24
+
 ### 新增
 
 - **`Ktav.format(String src)`** —— 保留注释的格式化器，作用于 Ktav
@@ -62,16 +64,26 @@ MINOR 递增视为破坏性变更。
   信封由永不抛异常的 streaming reader 解析：无法识别的载荷会降级为
   `Message` 类错误，而不是把一次诊断变成第二次失败。
 
+- **`Ktav.canonicalFromSource(String src)`** —— 在单个原生调用中解析
+  Ktav 源文本并重新输出为规范形式：相当于 `emitCanonical(loads(src))`，
+  但没有中间的 `Value` 树及其 JSON-wire 编解码往返。两个入口逐字节一致
+  —— 已在 bigint 整数、巨大指数、`-0.0` 与长尾数 float 上验证，文本
+  形式的存储让任何分歧都无处产生。与 `emitCanonical` 本身一样，注释与
+  空行不会被保留。
+
 ### 变更
 
-- **错误消息已更改。** 现在它们由信封的字段重建，而不是从核心的
-  `Display` 输出透传。依赖消息字符串进行匹配的调用方需要改为匹配
-  `getError()` / `getReason()` —— 这正是本次改动的目的。
-  `getMessage()` 保持人类可读，且永远不是原始 JSON。
+- **错误消息现在是核心自己的渲染。** `getMessage()` 逐字返回信封的
+  `message` 字段 —— 与 Rust crate 及所有其他绑定对同一错误打印的文本
+  相同 —— 而不是本地重新拼装的句子，也不是原始 JSON。对于不写入
+  `message` 字段的 0.8.0 之前原生库，绑定回退到自己的重构。依赖消息
+  字符串匹配的调用方应改为匹配 `getError()` / `getReason()` ——
+  这正是本次改动的目的。
 
-- **0.7.1 曾是 `format_str` 与 `ErrorEnvelope` 的中间最低版本**；本次
-  发布已将其取代。当前 `ktav` 要求的最低版本为 **0.8.0**，spec
-  子模块固定在 **v0.8.0**。
+- **中间的 0.7 周期从未发布。** 0.7.0/0.7.1 只是内部里程碑（跟踪
+  ktav 0.7、`format_str`、`ErrorEnvelope`），并被本发布取代；依赖
+  下限与 spec 固定版本从 0.6.4 直接跃迁到 **0.8.0**。不存在受支持的
+  0.7.x 绑定版本，也不存在 v0.7.0 的 spec 固定。
 
 - `crates/cabi` 改为单次调用 `ktav::declare_cabi!()`（ktav 的 `cabi`
   特性），取代手写的 C ABI 垫片；导出的符号集不变，因此 Java API
@@ -81,28 +93,42 @@ MINOR 递增视为破坏性变更。
   `v0.8.0` 发布资产。
 - Conformance 运行器读取 `spec/versions/0.8/tests`(子模块重新固定到
   `0.8.0` 之后，它一直静默读取过期的 `0.7` 语料——路径是硬编码的，
-  并非从固定版本推导而来），并执行语料中的每个类别，包括新增的
+  并非从固定版本推导而来)，并执行语料中的每个类别，包括新增的
   `strict-lossy/`（`loads()` 必须等于 lax 值，`loadsStrict()` 必须以
   匹配的原因、body 与规范形式抛出异常）。一个 guard 测试会在语料中
   出现无法识别的类别目录时使构建失败，以防止这个问题再次悄然发生。
+- 从未发布的 0.7 周期继承而来（历史 —— 在同一窗口内已被 0.8.0 固定
+  取代）：`rust-version` 提升至 `1.71`（ktav 0.7 的 MSRV）；运行器
+  开始执行 `unrepresentable/` 与 `parseable-unrepresentable/` 类别；
+  `emitCanonical` 输出与每个 valid fixture 的 `.canonical.ktav`
+  伴随文件逐字节比对（spec § 5.9.10、§ 5.9.8）；语料库填充度 guard
+  开始覆盖所有 fixture 类别。
 
-- 跟踪 `ktav 0.7.0` 与 spec 0.7.0；spec 子模块固定在 `v0.7.0`。
-- `rust-version` 提升至 `1.71`（ktav 0.7 的 MSRV）。
-- 一致性测试现在运行 spec 0.7 语料库；原始字节不是有效 UTF-8 的
-  invalid fixture（§ 6.15）在测试边界通过严格 UTF-8 解码予以拒绝 ——
-  Java API 接收 `String`，无法传入此类输入。
-- 一致性测试运行器现在执行 spec 0.7 的 `unrepresentable/` 与
-  `parseable-unrepresentable/` 类别：写入方必须拒绝 fixture 值，规范
-  输出必须拒绝解析后的值，并且在该 binding 能透出预期原因码的场合，
-  错误消息必须包含它。
-- 一致性测试运行器现在会将 `emitCanonical` 的输出与每个 valid fixture
-  的 `.canonical.ktav` 伴随文件逐字节比对（spec § 5.9.10、§ 5.9.8）——
-  此前规范化 writer 只检查是否拒绝 unrepresentable 值，从未与 spec
-  自身的规范字节做过比对。
-- 语料库填充度 guard 现在覆盖所有 fixture 类别（不再只是
-  `unrepresentable/`/`parseable-unrepresentable/`），断言每个类别非空，
-  拒绝未知的 fixture 类别目录，并断言 `valid/` 下 `.canonical.ktav`
-  伴随文件数量与 fixture 数量一致。
+- 文档：README 的简介与快速开始不再把 Maven Central 发布描述为
+  “已规划” —— release workflow 会在每个 tag 发布
+  `io.github.ktav-lang:ktav`。键转义示例不再使用行尾 `//` 注释 ——
+  这不是 Ktav 的语法（注释是独占一行的 `##`，§ 3.4）。`examples/basic`
+  已重写，去掉了已移除的 `:i` / `:f` 类型标记；`Value` 的 Javadoc
+  描述的是从词法形式推断数字类型，而非标记语法。
+
+### 修复
+
+- **`ScalarRoot` 与 `NonFiniteFloat` 现在会透出其规范的 § 5.9.0 原因码。**
+  这两种 unrepresentable 值此前根本到不了原生 writer —— JSON-wire 边界
+  会先把它们当作不透明的 `Message` 类错误拒绝 —— 因此 `getReason()`
+  返回 `null`，conformance 运行器也把这两种原因排除在断言之外。绑定
+  现在自行拒绝它们，并给出与核心 writer 相同的信封：`error`
+  `UnrepresentableAt`、规范原因、指向问题节点的解码键 `path`
+  （`ScalarRoot` 时为空）、`spec_section` `§ 5.9.0`，以及核心自己的
+  消息文本。`toStringForceStrings` 仍然把非有限 float 强制为 String，
+  而不是拒绝。
+- Conformance 运行器实现了 § 8.5 运行器契约：加载 `manifest.json`，
+  拒绝一切它未实现的 schema 版本，强制执行封闭的类别集合与精确的
+  fixture 数量，并遵循 `raw_bytes` 标志 —— invalid-UTF-8 fixture 在
+  严格的字节->String 边界上对照其 oracle 的 `InvalidUtf8` 预期进行
+  校验。Invalid fixture 现在会比较 JSON oracle 中的 `expected_error`，
+  而不是只断言“抛出了某个异常”。缺失 `ktav_cabi` 或 spec 子模块时，
+  语料测试会失败，而不是发出伪装通过的 skip 测试。
 
 ## 0.6.4 — 2026-08-23
 

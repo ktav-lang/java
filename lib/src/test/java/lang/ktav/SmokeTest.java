@@ -221,6 +221,101 @@ final class SmokeTest {
     }
 
     @Test
+    void toStringForceStringsCoercesNonFiniteFloatInsteadOfRejecting() {
+        // Spec § 5.9.0: coercion flattens every leaf scalar to a String,
+        // so a NaN Float is not unrepresentable here — it becomes the
+        // String "NaN". dumps/emitCanonical still refuse it; only this
+        // entry point is lenient (see WriterPrecheck). "NaN" is not
+        // numerically lexical, so the writer needs no raw marker; the
+        // reparse below is what proves the coercion.
+        LinkedHashMap<String, Value> entries = new LinkedHashMap<>();
+        entries.put("f", new Value.Flt("NaN"));
+
+        String out = Ktav.toStringForceStrings(new Value.Obj(entries));
+        assertNotNull(out);
+        assertTrue(out.contains("f: NaN"),
+                "coerced NaN must come back as the plain String value: " + out);
+        assertTrue(!out.contains("f::"), "no marker needed for non-lexical text: " + out);
+
+        // A float whose TEXT is numerically lexical must carry the raw
+        // marker, or the reparse would re-infer a Float (1e400 overflows
+        // to Infinity — exactly the wire-only value § 5.9.0 refuses in
+        // dumps/emitCanonical but force-strings coerces).
+        entries.put("g", new Value.Flt("1e400"));
+        String out2 = Ktav.toStringForceStrings(new Value.Obj(entries));
+        assertTrue(out2.contains("g:: 1e400"),
+                "lexically numeric text needs the raw marker: " + out2);
+
+        Value back = Ktav.loads(out2);
+        Value.Obj b = assertInstanceOf(Value.Obj.class, back);
+        assertEquals(new Value.Str("NaN"), b.entries().get("f"));
+        assertEquals(new Value.Str("1e400"), b.entries().get("g"));
+    }
+
+    @Test
+    void dumpsRejectsNonFiniteFloatInsideTopLevelArray() {
+        // Array items contribute no path segments, so the offending
+        // Float sits at an empty path — and the message carries no
+        // " at [...]" suffix at all.
+        KtavException e = assertThrows(KtavException.class,
+                () -> Ktav.dumps(new Value.Arr(List.of(new Value.Flt("Infinity")))));
+        assertEquals("NonFiniteFloat", e.getReason());
+        assertNotNull(e.getPath());
+        assertTrue(e.getPath().isEmpty(),
+                "array items add no path segments: " + e.getPath());
+        assertTrue(!e.getMessage().contains(" at ["),
+                "empty path must not render a path suffix: " + e.getMessage());
+    }
+
+    @Test
+    void nonFiniteFloatPathKeepsSupplementaryScalarsLiteral() {
+        // Rust's string Debug formats per Unicode scalar: a printable
+        // supplementary code point (an emoji) stays literal, while a
+        // control code point becomes a brace escape. Escaping per
+        // UTF-16 char would split the emoji into two lone surrogates.
+        LinkedHashMap<String, Value> m = new LinkedHashMap<>();
+        m.put("\uD83D\uDE00", new Value.Flt("NaN"));
+        KtavException e = assertThrows(KtavException.class,
+                () -> Ktav.dumps(new Value.Obj(m)));
+        assertEquals(List.of("\uD83D\uDE00"), e.getPath(),
+                "the emoji key must stay one exact path segment");
+        assertTrue(e.getMessage().contains("at [\"\uD83D\uDE00\"]"),
+                "printable emoji must stay literal: " + e.getMessage());
+        assertTrue(!e.getMessage().contains("\\u{d83d}"),
+                "no per-char surrogate escapes: " + e.getMessage());
+
+        m.clear();
+        m.put("\u0007", new Value.Flt("NaN"));
+        KtavException ctl = assertThrows(KtavException.class,
+                () -> Ktav.dumps(new Value.Obj(m)));
+        assertTrue(ctl.getMessage().contains("at [\"\\u{7}\"]"),
+                "control code points escape Rust-style: " + ctl.getMessage());
+    }
+
+    @Test
+    void nanPayloadSpellingsTrackTheCoresOwnParser() {
+        // Rust's f64::from_str rejects EVERY NaN payload form — a probe
+        // over nan(0x1)/nan(zz)/nan(_)/nan()/nan(z.z)/nan(1_0) all came
+        // back "invalid float literal" — so such text is not a spelling
+        // the core's writers would treat as non-finite. It is still
+        // outside the wire's float grammar (no '.' or exponent), but
+        // that makes it a wire Message with a null reason, NOT the
+        // normative NonFiniteFloat — the binding must not preempt it.
+        LinkedHashMap<String, Value> m = new LinkedHashMap<>();
+        m.put("f", new Value.Flt("nan(0x1)"));
+        KtavException bad = assertThrows(KtavException.class,
+                () -> Ktav.dumps(new Value.Obj(m)));
+        assertNull(bad.getReason());
+
+        // The payload-less spellings Rust DOES accept (any case, optional
+        // sign) are the ones § 5.9.0 owns.
+        m.put("f", new Value.Flt("NaN"));
+        KtavException e = assertThrows(KtavException.class,
+                () -> Ktav.dumps(new Value.Obj(m)));
+        assertEquals("NonFiniteFloat", e.getReason());
+    }
+
+    @Test
     void loadsQuotedKey() {
         // spec § 5.3.3: quoted key segments. From the 0.7 corpus
         // (valid/quoted_keys/double_quote_basic.*): `"a": 1` parses to

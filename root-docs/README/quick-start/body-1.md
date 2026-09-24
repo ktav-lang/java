@@ -6,8 +6,6 @@
 ```kotlin
 repositories {
     mavenCentral()
-    // while we're not yet on Maven Central, consume the JAR from
-    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
@@ -24,8 +22,6 @@ dependencies {
 ```kotlin
 repositories {
     mavenCentral()
-    // while we're not yet on Maven Central, consume the JAR from
-    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
@@ -42,8 +38,6 @@ dependencies {
 ```kotlin
 repositories {
     mavenCentral()
-    // while we're not yet on Maven Central, consume the JAR from
-    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {

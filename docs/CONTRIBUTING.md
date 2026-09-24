@@ -141,8 +141,12 @@ Tag `v<X.Y.Z>` on `main`. The release workflow cross-compiles six
 platform binaries (`linux` amd64/arm64, `darwin` amd64/arm64, `windows`
 amd64/arm64) plus builds the library JAR, and attaches all of them as
 GitHub Release assets. The `LIB_VERSION` constant in
-`NativeLoader.java` must match the tag — change it in the same commit
-as the tag message.
+`NativeLoader.java` must match the tag — bump it in the release-prep
+commit that precedes the tag.
+
+The same tag also publishes the JAR to Maven Central as
+`io.github.ktav-lang:ktav` (Sonatype Central Portal, via the
+`publish-maven` job in `release.yml`).
 
 ## Philosophy
 

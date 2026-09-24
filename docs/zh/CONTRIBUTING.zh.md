@@ -128,8 +128,10 @@ CI 运行相同的命令；推送前请先在本地运行。
 在 `main` 上打 `v<X.Y.Z>` tag。Release workflow 交叉编译六个
 平台二进制（`linux` amd64/arm64、`darwin` amd64/arm64、`windows`
 amd64/arm64）并构建库 JAR，全部作为 GitHub Release 资产。
-`NativeLoader.java` 中的 `LIB_VERSION` 必须与 tag 一致 —— 请在
-打 tag 消息的同一提交里更新。
+`NativeLoader.java` 中的 `LIB_VERSION` 必须与 tag 一致 —— 请在打 tag 之前的发布准备提交中更新。
+
+同一 tag 还会把 JAR 发布到 Maven Central（`io.github.ktav-lang:ktav`，
+经 `release.yml` 的 `publish-maven` job，走 Sonatype Central Portal）。
 
 ## 哲学
 

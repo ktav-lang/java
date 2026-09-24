@@ -14,10 +14,10 @@ import java.util.Objects;
  * <ul>
  *   <li>{@link Null}   — the {@code null} keyword.</li>
  *   <li>{@link Bool}   — {@code true} / {@code false}.</li>
- *   <li>{@link Int}    — typed integer ({@code :i}). Held as text for
+ *   <li>{@link Int}    — integer scalar. Held as text for
  *       arbitrary precision; convert via {@link Int#toBigInteger()} /
  *       {@link Int#toLong()}.</li>
- *   <li>{@link Flt}    — typed float ({@code :f}). Held as text for
+ *   <li>{@link Flt}    — float scalar. Held as text for
  *       exact round-trip; convert via {@link Flt#toDouble()}.</li>
  *   <li>{@link Str}    — untyped scalar / string leaf.</li>
  *   <li>{@link Arr}    — {@code [ ... ]} array.</li>
@@ -51,10 +51,13 @@ public sealed interface Value
     }
 
     /**
-     * Typed integer scalar (the {@code :i} form). Payload is the digit
-     * form with an optional leading minus; leading plus is stripped at
-     * parse time. Arbitrary precision — use {@link #toBigInteger()} when
-     * the value may exceed {@code long}.
+     * Integer scalar. Since spec 0.5.0, numeric-looking scalars without
+     * {@code .}, {@code e}, or {@code E} are Integers; those containing
+     * one are Floats. Other scalar text is a String (the raw marker
+     * {@code ::} forces String).
+     * Payload is the digit form with an optional leading minus; leading
+     * plus is stripped at parse time. Arbitrary precision — use
+     * {@link #toBigInteger()} when the value may exceed {@code long}.
      */
     record Int(String text) implements Value {
         public Int {
@@ -79,9 +82,11 @@ public sealed interface Value
     }
 
     /**
-     * Typed float scalar (the {@code :f} form). Payload is the textual
-     * mantissa with a decimal point and optional scientific exponent —
-     * held as text so precision round-trips exactly.
+     * Float scalar. Since spec 0.5.0, numeric-looking scalars containing
+     * {@code .}, {@code e}, or {@code E} are Floats; those without one
+     * are Integers. Other scalar text is a String (the raw marker
+     * {@code ::} forces String). Payload is held as text so precision
+     * round-trips exactly.
      */
     record Flt(String text) implements Value {
         public Flt {

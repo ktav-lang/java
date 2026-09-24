@@ -103,9 +103,9 @@ jobs:
           if-no-files-found: error
 
   # ------------------------------------------------------------------
-  # Build the Java JARs (main / sources / javadoc). These are attached
-  # to the release alongside the native binaries so consumers can pull
-  # them directly until Maven Central publishing is set up.
+  # Build the Java JARs (main / sources / javadoc). publish-maven sends
+  # them to Maven Central; these copies are also attached to the GitHub
+  # Release as a direct-download fallback.
   # ------------------------------------------------------------------
   build-jars:
     name: build JARs

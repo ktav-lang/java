@@ -5,7 +5,7 @@
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Parse a Ktav document into the `Value` tree. |
 | `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
-| `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj`. |
+| `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj` or `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Render like `dumps`, but coerce every leaf scalar to a String. |
 | `Ktav.emitCanonical(Value) -> String` | Render a `Value` as deterministic canonical form. |
 | `Ktav.format(String) -> String` | Normalise a document's spelling, keeping comments. |
@@ -16,7 +16,7 @@
 their textual form via the raw marker (`::`); objects and arrays keep
 their structure, since only leaves are coerced. The result parses back
 through `loads` as the same set of String scalars — useful when a
-downstream consumer does not understand typed markers.
+downstream consumer does not understand typed scalars.
 
 >>>>> lang=ru
 ## API
@@ -25,7 +25,7 @@ downstream consumer does not understand typed markers.
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Разобрать Ktav-документ в дерево `Value`. |
 | `Ktav.loadsStrict(String) -> Value` | Разобрать документ со строгой проверкой записи чисел. |
-| `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj`. |
+| `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj` или `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Отрендерить как `dumps`, но привести каждый leaf-скаляр к String. |
 | `Ktav.emitCanonical(Value) -> String` | Отрендерить `Value` в детерминированной канонической форме. |
 | `Ktav.format(String) -> String` | Нормализовать написание документа, сохраняя комментарии. |
@@ -36,7 +36,7 @@ downstream consumer does not understand typed markers.
 текстовую форму через сырой маркер (`::`); объекты и массивы сохраняют
 структуру, потому что приводятся только листья. Результат разбирается
 обратно через `loads` как тот же набор String-скаляров — полезно, когда
-потребитель на выходе не понимает типизированных маркеров.
+потребитель на выходе не понимает типизированных скаляров.
 
 >>>>> lang=zh
 ## API
@@ -45,7 +45,7 @@ downstream consumer does not understand typed markers.
 | --- | --- |
 | `Ktav.loads(String) -> Value` | 将 Ktav 文档解析为 `Value` 树。 |
 | `Ktav.loadsStrict(String) -> Value` | 使用严格数字词法检查解析文档。 |
-| `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj`。 |
+| `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj` 或 `Arr`。 |
 | `Ktav.toStringForceStrings(Value) -> String` | 输出与 `dumps` 相同，但把每个叶子标量强制为 String。 |
 | `Ktav.emitCanonical(Value) -> String` | 将 `Value` 渲染为确定性的规范形式。 |
 | `Ktav.format(String) -> String` | 规范化文档的写法，同时保留注释。 |
@@ -55,5 +55,5 @@ downstream consumer does not understand typed markers.
 `toStringForceStrings` 把整数、float、布尔与 `null` 用原始标记(`::`)
 压平为它们的文本形式；对象与数组保持自身结构，因为只有叶子会被强制。
 结果经由 `loads` 解析回来仍是同一组 String 标量 —— 当下游消费方不理解
-类型标记时，这很有用。
+类型化标量时，这很有用。
 

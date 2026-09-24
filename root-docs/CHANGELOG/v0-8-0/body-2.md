@@ -27,10 +27,6 @@
   cannot. The `reason` code is identical in both, so a caller that only
   needs "the write was refused" matches on `getReason()`.
 
-  The envelope is parsed by a streaming reader that never throws: an
-  unrecognised payload degrades to a `Message`-class error rather than
-  turning a diagnostic into a second failure.
-
 >>>>> lang=ru
 - **`KtavException` теперь несёт девять структурированных полей ошибки** из
   error envelope Rust-ядра: `getError()`, `getReason()`,
@@ -62,10 +58,6 @@
   случаях, поэтому вызывающему, которому нужно лишь убедиться, что
   «запись отклонена», достаточно сравнивать `getReason()`.
 
-  Конверт разбирает streaming reader, который никогда не бросает
-  исключений: нераспознанная нагрузка деградирует до ошибки класса
-  `Message`, вместо того чтобы превращать диагностику во вторую ошибку.
-
 >>>>> lang=zh
 - **`KtavException` 现在携带九个结构化错误字段**，来自 Rust 核心的
   error envelope：`getError()`、`getReason()`、`getLine()`、
@@ -92,7 +84,4 @@
   能指出问题节点所在时（此时它还会填充 `getPath()`）；
   `"Unrepresentable"` —— 当不能时。两者的 `reason` 码相同，因此只需
   判断“写入被拒绝”的调用方匹配 `getReason()` 即可。
-
-  信封由永不抛异常的 streaming reader 解析：无法识别的载荷会降级为
-  `Message` 类错误，而不是把一次诊断变成第二次失败。
 

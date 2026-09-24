@@ -15,8 +15,10 @@ Java-биндинги к [формату конфигурации Ktav](https://
 сборки JNI на стороне потребителя**, обычный Gradle/Maven просто
 работает.
 
-Требуется **JDK 17+**. Пока распространяется через GitHub Releases
-(публикация в Maven Central — запланирована).
+Требуется **JDK 17+**. JAR публикуется в **Maven Central** как
+`io.github.ktav-lang:ktav` — release-workflow делает это с каждым тегом;
+нативный бинарник `ktav_cabi` один раз подгружается в runtime из
+соответствующего GitHub Release.
 
 ## Быстрый старт
 
@@ -25,8 +27,6 @@ Java-биндинги к [формату конфигурации Ktav](https://
 ```kotlin
 repositories {
     mavenCentral()
-    // while we're not yet on Maven Central, consume the JAR from
-    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
@@ -119,7 +119,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Разобрать Ktav-документ в дерево `Value`. |
 | `Ktav.loadsStrict(String) -> Value` | Разобрать документ со строгой проверкой записи чисел. |
-| `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj`. |
+| `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj` или `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Отрендерить как `dumps`, но привести каждый leaf-скаляр к String. |
 | `Ktav.emitCanonical(Value) -> String` | Отрендерить `Value` в детерминированной канонической форме. |
 | `Ktav.format(String) -> String` | Нормализовать написание документа, сохраняя комментарии. |
@@ -130,7 +130,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 текстовую форму через сырой маркер (`::`); объекты и массивы сохраняют
 структуру, потому что приводятся только листья. Результат разбирается
 обратно через `loads` как тот же набор String-скаляров — полезно, когда
-потребитель на выходе не понимает типизированных маркеров.
+потребитель на выходе не понимает типизированных скаляров.
 
 ### Форматирование
 
@@ -226,11 +226,11 @@ writer может указать виновный узел (тогда он за
 Начиная со spec 0.6.4 литеральные `.` или `:` внутри сегмента ключа
 записываются через backslash:
 
-```text
-a\.b: v        // key is the single segment "a.b" -> { "a.b": "v" }
-a\:b: v        // key contains a colon            -> { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     -> { "x": { "y.z": "v" } }
-```
+| источник | разбирается как |
+| --- | --- |
+| `a\.b: v` | `{ "a.b": "v" }` — ключ является одним сегментом `a.b` |
+| `a\:b: v` | `{ "a:b": "v" }` — ключ содержит двоеточие |
+| `x.y\.z: v` | `{ "x": { "y.z": "v" } }` — разделение только по первой точке; экранированная точка не разделяет |
 
 Литеральный backslash в ключе пишется как `\\`.
 

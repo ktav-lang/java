@@ -13,6 +13,8 @@ itself — for the latter see
 
 ## Unreleased
 
+## 0.8.0 — 2026-09-24
+
 ### Added
 
 - **`Ktav.format(String src)`** — a comment-preserving formatter over
@@ -71,19 +73,31 @@ itself — for the latter see
   unrecognised payload degrades to a `Message`-class error rather than
   turning a diagnostic into a second failure.
 
+- **`Ktav.canonicalFromSource(String src)`** — parses Ktav source and
+  re-emits it in canonical form in a single native call:
+  `emitCanonical(loads(src))` without the intermediate `Value` tree and
+  its JSON-wire encode/decode round-trip. The two entry points agree
+  byte for byte — verified over bigint integers, huge exponents, `-0.0`
+  and long-mantissa floats, where the stored text form leaves nothing
+  to diverge. Comments and blank lines do not survive, like
+  `emitCanonical` itself.
+
 ### Changed
 
-- **Error messages have changed.** They are now reconstructed from the
-  envelope's fields rather than passed through from the core's
-  `Display` output. Callers matching on message strings will need to
-  match on `getError()` / `getReason()` instead — which is the point of
-  the change. `getMessage()` remains human-readable and is never the
-  raw JSON.
+- **Error messages are now the core's own rendering.** `getMessage()`
+  returns the envelope's `message` field verbatim — the same text the
+  Rust crate and every other binding print for the same error — never
+  a locally reassembled sentence and never raw JSON. Against a native
+  library older than 0.8.0, which wrote no `message` field, the binding
+  falls back to its own reconstruction. Callers matching on message
+  strings should match `getError()` / `getReason()` instead — which is
+  the point of the change.
 
-- **0.7.1 was an intermediate minimum** for `format_str` and
-  `ErrorEnvelope`; it was superseded for this release. The current
-  `ktav` requirement has a **0.8.0** floor, and the spec submodule is
-  pinned to **v0.8.0**.
+- **The intermediate 0.7 cycle never shipped.** 0.7.0/0.7.1 existed only
+  as internal milestones (ktav 0.7 tracking, `format_str`,
+  `ErrorEnvelope`) and were superseded by this release; the dependency
+  floor and the spec pin moved straight from 0.6.4 to **0.8.0**. There
+  is no supported 0.7.x binding version and no v0.7.0 spec pin.
 
 - Migrated `crates/cabi` to a single `ktav::declare_cabi!()` invocation
   (ktav's `cabi` feature) instead of a hand-rolled C ABI shim; the
@@ -103,28 +117,45 @@ itself — for the latter see
   guard test fails the build if an unrecognized category directory
   appears under the corpus, so a future addition can't repeat this
   silently.
+- Carried over from the unreleased 0.7 cycle (history — superseded by
+  the 0.8.0 pin in the same window): `rust-version` raised to `1.71`
+  (the ktav 0.7 MSRV); the runner began executing the `unrepresentable/`
+  and `parseable-unrepresentable/` categories; `emitCanonical` output
+  is compared byte-for-byte against every valid fixture's
+  `.canonical.ktav` companion (spec § 5.9.10, § 5.9.8); the
+  corpus-population guard came to cover every fixture category.
 
-- Tracks `ktav 0.7.0` and spec 0.7.0; the spec submodule is pinned to
-  `v0.7.0`.
-- `rust-version` raised to `1.71` (the ktav 0.7 MSRV).
-- Conformance tests now run the spec 0.7 corpus; invalid fixtures whose
-  raw bytes are not valid UTF-8 (§ 6.15) are rejected at the strict-UTF-8
-  test boundary, since the Java API takes a `String` and cannot receive
-  such input.
-- The conformance runner now executes the spec 0.7 `unrepresentable/`
-  and `parseable-unrepresentable/` categories: writers must refuse the
-  fixture values, canonical emit must refuse the parsed values, and the
-  expected reason code must appear in the error message where this
-  binding surfaces it.
-- The conformance runner now checks `emitCanonical` output against every
-  valid fixture's `.canonical.ktav` companion byte-for-byte (spec
-  § 5.9.10, § 5.9.8) — previously the canonical writer was only checked
-  for refusing unrepresentable values, never compared against the
-  spec's own canonical bytes.
-- The corpus-population guard now covers every fixture category (not
-  just `unrepresentable`/`parseable-unrepresentable`), asserts each is
-  non-empty, rejects an unknown fixture category directory, and asserts
-  `valid/` ships as many `.canonical.ktav` companions as fixtures.
+- Documentation: the README intro and quick start no longer describe
+  Maven Central publication as "planned" — `io.github.ktav-lang:ktav`
+  is published there by the release workflow on every tag. The
+  key-escaping examples no longer use trailing `//` comments, which are
+  not Ktav syntax (a comment is a `##` line, § 3.4). `examples/basic`
+  was rewritten without the removed `:i` / `:f` typed markers, and the
+  `Value` Javadoc describes lexical numeric inference instead of the
+  marker syntax.
+
+### Fixed
+
+- **`ScalarRoot` and `NonFiniteFloat` now surface their normative
+  § 5.9.0 reason codes.** These two unrepresentable Values could never
+  reach the native writers — the JSON-wire boundary refused them first
+  as opaque `Message`-class errors — so `getReason()` came back `null`
+  and the conformance runner exempted both reasons from its assertions.
+  The binding now rejects them itself with the envelope the core's
+  writers produce: `error` `UnrepresentableAt`, the spec reason, the
+  decoded key `path` to the offending node (empty for `ScalarRoot`),
+  `spec_section` `§ 5.9.0`, and the core's own message text.
+  `toStringForceStrings` still coerces non-finite floats to Strings
+  rather than rejecting them.
+- The conformance runner implements the § 8.5 runner contract: it loads
+  `manifest.json`, rejects any schema version it does not implement, enforces
+  the closed category set and exact fixture counts, and honours the
+  `raw_bytes` flag — the invalid-UTF-8 fixture is checked against its
+  oracle's `InvalidUtf8` expectation at the strict byte-to-String
+  boundary. Invalid fixtures now compare `expected_error` from their
+  JSON oracle instead of only asserting that some exception is thrown.
+  A missing `ktav_cabi` or spec submodule fails the corpus tests
+  instead of emitting passing skip tests.
 
 ## 0.6.4 — 2026-08-23
 

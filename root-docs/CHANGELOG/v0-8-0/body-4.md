@@ -1,18 +1,4 @@
 >>>>> lang=en
-### Changed
-
-- **Error messages have changed.** They are now reconstructed from the
-  envelope's fields rather than passed through from the core's
-  `Display` output. Callers matching on message strings will need to
-  match on `getError()` / `getReason()` instead — which is the point of
-  the change. `getMessage()` remains human-readable and is never the
-  raw JSON.
-
-- **0.7.1 was an intermediate minimum** for `format_str` and
-  `ErrorEnvelope`; it was superseded for this release. The current
-  `ktav` requirement has a **0.8.0** floor, and the spec submodule is
-  pinned to **v0.8.0**.
-
 - Migrated `crates/cabi` to a single `ktav::declare_cabi!()` invocation
   (ktav's `cabi` feature) instead of a hand-rolled C ABI shim; the
   exported symbol surface is unchanged, so the Java API is unaffected.
@@ -31,22 +17,15 @@
   guard test fails the build if an unrecognized category directory
   appears under the corpus, so a future addition can't repeat this
   silently.
+- Carried over from the unreleased 0.7 cycle (history — superseded by
+  the 0.8.0 pin in the same window): `rust-version` raised to `1.71`
+  (the ktav 0.7 MSRV); the runner began executing the `unrepresentable/`
+  and `parseable-unrepresentable/` categories; `emitCanonical` output
+  is compared byte-for-byte against every valid fixture's
+  `.canonical.ktav` companion (spec § 5.9.10, § 5.9.8); the
+  corpus-population guard came to cover every fixture category.
 
 >>>>> lang=ru
-### Изменено
-
-- **Сообщения об ошибках изменились.** Теперь они реконструируются из
-  полей конверта, а не пробрасываются из вывода `Display` ядра.
-  Вызывающим, которые матчатся на строки сообщений, нужно будет матчиться
-  на `getError()` / `getReason()` — в этом и смысл изменения.
-  `getMessage()` остаётся человекочитаемым и никогда не является сырым
-  JSON.
-
-- **0.7.1 была промежуточной минимальной версией** для `format_str` и
-  `ErrorEnvelope`; для этого релиза она заменена. Текущее требование к
-  `ktav` имеет нижнюю границу **0.8.0**, а подмодуль spec закреплён на
-  **v0.8.0**.
-
 - `crates/cabi` переведён на один вызов `ktav::declare_cabi!()` (фича
   `cabi` крейта ktav) вместо рукописной C ABI-прослойки; набор
   экспортируемых символов не изменился, поэтому Java API не затронут.
@@ -64,19 +43,15 @@
   причиной, телом и канонической формой). Guard-тест обрушивает сборку
   при появлении нераспознанной категории в корпусе, чтобы это не
   повторилось молча.
+- Унаследовано из невышедшего цикла 0.7 (история — в том же окне
+  заменена пином 0.8.0): `rust-version` поднят до `1.71` (MSRV
+  ktav 0.7); раннер начал исполнять категории `unrepresentable/` и
+  `parseable-unrepresentable/`; вывод `emitCanonical` сверяется
+  побайтово с companion-файлом `.canonical.ktav` каждой valid-фикстуры
+  (spec § 5.9.10, § 5.9.8); guard заполненности корпуса стал покрывать
+  все категории фикстур.
 
 >>>>> lang=zh
-### 变更
-
-- **错误消息已更改。** 现在它们由信封的字段重建，而不是从核心的
-  `Display` 输出透传。依赖消息字符串进行匹配的调用方需要改为匹配
-  `getError()` / `getReason()` —— 这正是本次改动的目的。
-  `getMessage()` 保持人类可读，且永远不是原始 JSON。
-
-- **0.7.1 曾是 `format_str` 与 `ErrorEnvelope` 的中间最低版本**；本次
-  发布已将其取代。当前 `ktav` 要求的最低版本为 **0.8.0**，spec
-  子模块固定在 **v0.8.0**。
-
 - `crates/cabi` 改为单次调用 `ktav::declare_cabi!()`（ktav 的 `cabi`
   特性），取代手写的 C ABI 垫片；导出的符号集不变，因此 Java API
   不受影响。0.8.0 依赖下限和 `v0.8.0` spec 固定版本带来 § 5.2：
@@ -85,8 +60,14 @@
   `v0.8.0` 发布资产。
 - Conformance 运行器读取 `spec/versions/0.8/tests`(子模块重新固定到
   `0.8.0` 之后，它一直静默读取过期的 `0.7` 语料——路径是硬编码的，
-  并非从固定版本推导而来），并执行语料中的每个类别，包括新增的
+  并非从固定版本推导而来)，并执行语料中的每个类别，包括新增的
   `strict-lossy/`（`loads()` 必须等于 lax 值，`loadsStrict()` 必须以
   匹配的原因、body 与规范形式抛出异常）。一个 guard 测试会在语料中
   出现无法识别的类别目录时使构建失败，以防止这个问题再次悄然发生。
+- 从未发布的 0.7 周期继承而来（历史 —— 在同一窗口内已被 0.8.0 固定
+  取代）：`rust-version` 提升至 `1.71`（ktav 0.7 的 MSRV）；运行器
+  开始执行 `unrepresentable/` 与 `parseable-unrepresentable/` 类别；
+  `emitCanonical` 输出与每个 valid fixture 的 `.canonical.ktav`
+  伴随文件逐字节比对（spec § 5.9.10、§ 5.9.8）；语料库填充度 guard
+  开始覆盖所有 fixture 类别。
 

@@ -14,8 +14,10 @@ Thin wrapper around the reference Rust parser, loaded at runtime through
 [JNA](https://github.com/java-native-access/jna) — so **no JNI build on
 the consumer side**, plain Gradle/Maven just works.
 
-Requires **JDK 17+**. Distributed via GitHub Releases for now
-(Maven Central publication is planned).
+Requires **JDK 17+**. The JAR is published to **Maven Central** as
+`io.github.ktav-lang:ktav` by the release workflow on every tag; the
+native `ktav_cabi` binary is fetched once at runtime from the matching
+GitHub Release.
 
 ## Quick start
 
@@ -24,8 +26,6 @@ Requires **JDK 17+**. Distributed via GitHub Releases for now
 ```kotlin
 repositories {
     mavenCentral()
-    // while we're not yet on Maven Central, consume the JAR from
-    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
@@ -118,7 +118,7 @@ A complete runnable version lives in [`examples/basic`](examples/basic/src/main/
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Parse a Ktav document into the `Value` tree. |
 | `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
-| `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj`. |
+| `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj` or `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Render like `dumps`, but coerce every leaf scalar to a String. |
 | `Ktav.emitCanonical(Value) -> String` | Render a `Value` as deterministic canonical form. |
 | `Ktav.format(String) -> String` | Normalise a document's spelling, keeping comments. |
@@ -129,7 +129,7 @@ A complete runnable version lives in [`examples/basic`](examples/basic/src/main/
 their textual form via the raw marker (`::`); objects and arrays keep
 their structure, since only leaves are coerced. The result parses back
 through `loads` as the same set of String scalars — useful when a
-downstream consumer does not understand typed markers.
+downstream consumer does not understand typed scalars.
 
 ### Formatting
 
@@ -223,11 +223,11 @@ for byte across parse/render cycles.
 Since spec 0.6.4 a literal `.` or `:` inside a key segment is written
 with a backslash:
 
-```text
-a\.b: v        // key is the single segment "a.b" -> { "a.b": "v" }
-a\:b: v        // key contains a colon            -> { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     -> { "x": { "y.z": "v" } }
-```
+| source | parses as |
+| --- | --- |
+| `a\.b: v` | `{ "a.b": "v" }` — the key is the single segment `a.b` |
+| `a\:b: v` | `{ "a:b": "v" }` — the key contains a colon |
+| `x.y\.z: v` | `{ "x": { "y.z": "v" } }` — split on the first dot only; the escaped dot does not split |
 
 A literal backslash in a key is `\\`.
 

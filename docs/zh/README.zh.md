@@ -14,8 +14,9 @@
 [JNA](https://github.com/java-native-access/jna) 动态加载 ——
 **使用方不需要编译 JNI**,常规的 Gradle/Maven 流程即可。
 
-需要 **JDK 17+**。目前通过 GitHub Releases 分发
-(已规划发布到 Maven Central)。
+需要 **JDK 17+**。JAR 由 release workflow 随每个 tag 发布到
+**Maven Central**（坐标 `io.github.ktav-lang:ktav`）；原生 `ktav_cabi`
+二进制则在运行时从对应的 GitHub Release 一次性获取。
 
 ## 快速开始
 
@@ -24,8 +25,6 @@
 ```kotlin
 repositories {
     mavenCentral()
-    // while we're not yet on Maven Central, consume the JAR from
-    // the GitHub Release — see the README for a worked example.
 }
 
 dependencies {
@@ -118,7 +117,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | --- | --- |
 | `Ktav.loads(String) -> Value` | 将 Ktav 文档解析为 `Value` 树。 |
 | `Ktav.loadsStrict(String) -> Value` | 使用严格数字词法检查解析文档。 |
-| `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj`。 |
+| `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj` 或 `Arr`。 |
 | `Ktav.toStringForceStrings(Value) -> String` | 输出与 `dumps` 相同，但把每个叶子标量强制为 String。 |
 | `Ktav.emitCanonical(Value) -> String` | 将 `Value` 渲染为确定性的规范形式。 |
 | `Ktav.format(String) -> String` | 规范化文档的写法，同时保留注释。 |
@@ -128,7 +127,7 @@ String text = Ktav.dumps(new Value.Obj(doc));
 `toStringForceStrings` 把整数、float、布尔与 `null` 用原始标记(`::`)
 压平为它们的文本形式；对象与数组保持自身结构，因为只有叶子会被强制。
 结果经由 `loads` 解析回来仍是同一组 String 标量 —— 当下游消费方不理解
-类型标记时，这很有用。
+类型化标量时，这很有用。
 
 ### 格式化
 
@@ -214,11 +213,11 @@ writer 的两种拒绝被分开命名 —— 当 writer 能指出是哪个节点
 
 自 spec 0.6.4 起,键段内的字面量 `.` 或 `:` 通过反斜杠书写:
 
-```text
-a\.b: v        // key is the single segment "a.b" -> { "a.b": "v" }
-a\:b: v        // key contains a colon            -> { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     -> { "x": { "y.z": "v" } }
-```
+| 写法 | 解析为 |
+| --- | --- |
+| `a\.b: v` | `{ "a.b": "v" }` —— 键是单个段 `a.b` |
+| `a\:b: v` | `{ "a:b": "v" }` —— 键包含冒号 |
+| `x.y\.z: v` | `{ "x": { "y.z": "v" } }` —— 仅在第一个点处分割；被转义的点不再分割 |
 
 键中的字面量反斜杠写作 `\\`。
 

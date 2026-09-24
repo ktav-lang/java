@@ -62,15 +62,25 @@ public final class Ktav {
 
     /**
      * Render a {@link Value} back to Ktav text. The top-level value must
-     * be a {@link Value.Obj} or {@link Value.Arr} — other shapes are
-     * rejected by the native side. Top-level arrays are supported as of
-     * spec 0.1.1 (binding 0.3.1). Throws {@link KtavException} on render
-     * error.
+     * be a {@link Value.Obj} or {@link Value.Arr}. Top-level arrays are
+     * supported as of spec 0.1.1 (binding 0.3.1). Throws
+     * {@link KtavException} on render error.
+     *
+     * <p>Unrepresentable values (spec &sect; 5.9.0) are rejected with the
+     * spec's reason codes surfaced through
+     * {@link KtavException#getReason()} / {@link KtavException#getPath()}:
+     * {@code ScalarRoot} for a non-Obj/non-Arr root, and
+     * {@code NonFiniteFloat} for a {@link Value.Flt} whose text parses to
+     * NaN or &plusmn;Infinity. Both conditions are invisible to the native
+     * writers (the JSON wire rejects them first as opaque {@code
+     * Message}-class errors), so this binding checks for them itself —
+     * see {@code WriterPrecheck}.
      */
     public static String dumps(Value value) {
         if (value == null) {
             throw new NullPointerException("value");
         }
+        WriterPrecheck.checkRepresentable(value);
         byte[] input = WireJson.encode(value);
         byte[] output = callNative(NativeOp.DUMPS, input);
         return new String(output, StandardCharsets.UTF_8);
@@ -85,11 +95,21 @@ public final class Ktav {
      * {@link #loads} as the same set of String scalars.
      *
      * <p>Useful for "everything is a string" dumps — e.g. for downstream
-     * consumers that don't understand typed markers, or for diff-friendly
+     * consumers that don't understand typed scalars, or for diff-friendly
      * canonical text.
      *
      * <p>The top-level value must be a {@link Value.Obj} or
      * {@link Value.Arr}. Throws {@link KtavException} on render error.
+     *
+     * <p>Unlike {@link #dumps} and {@link #emitCanonical}, this does NOT
+     * reject non-finite floats: they are coerced to their textual String
+     * form before the write, and the output is exactly what the core's
+     * force-strings writer produces (e.g. {@code f: NaN}); the JSON wire
+     * cannot carry such payloads at all, so the binding performs the leaf
+     * coercion itself. {@link #dumps} and {@link #emitCanonical} reject
+     * them with the {@code NonFiniteFloat} reason instead. The
+     * {@code ScalarRoot} root check still applies — see
+     * {@code WriterPrecheck}.
      *
      * @since 0.3.1
      */
@@ -97,6 +117,7 @@ public final class Ktav {
         if (value == null) {
             throw new NullPointerException("value");
         }
+        value = WriterPrecheck.forCoercingWriter(value);
         byte[] input = WireJson.encode(value);
         byte[] output = callNative(NativeOp.DUMPS_FORCE_STRINGS, input);
         return new String(output, StandardCharsets.UTF_8);
@@ -109,12 +130,23 @@ public final class Ktav {
      * {@link Value.Obj} or {@link Value.Arr}. Throws {@link KtavException}
      * on render error.
      *
+     * <p>Unrepresentable values (spec &sect; 5.9.0) are rejected with the
+     * spec's reason codes surfaced through
+     * {@link KtavException#getReason()} / {@link KtavException#getPath()}:
+     * {@code ScalarRoot} for a non-Obj/non-Arr root, and
+     * {@code NonFiniteFloat} for a {@link Value.Flt} whose text parses to
+     * NaN or &plusmn;Infinity. Both conditions are invisible to the native
+     * writers (the JSON wire rejects them first as opaque {@code
+     * Message}-class errors), so this binding checks for them itself —
+     * see {@code WriterPrecheck}.
+     *
      * @since 0.5.0
      */
     public static String emitCanonical(Value value) {
         if (value == null) {
             throw new NullPointerException("value");
         }
+        WriterPrecheck.checkRepresentable(value);
         byte[] input = WireJson.encode(value);
         byte[] output = callNative(NativeOp.EMIT_CANONICAL, input);
         return new String(output, StandardCharsets.UTF_8);

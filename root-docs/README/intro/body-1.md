@@ -15,8 +15,10 @@ Thin wrapper around the reference Rust parser, loaded at runtime through
 [JNA](https://github.com/java-native-access/jna) — so **no JNI build on
 the consumer side**, plain Gradle/Maven just works.
 
-Requires **JDK 17+**. Distributed via GitHub Releases for now
-(Maven Central publication is planned).
+Requires **JDK 17+**. The JAR is published to **Maven Central** as
+`io.github.ktav-lang:ktav` by the release workflow on every tag; the
+native `ktav_cabi` binary is fetched once at runtime from the matching
+GitHub Release.
 
 >>>>> lang=ru
 # ktav — биндинги для Java
@@ -36,8 +38,10 @@ Java-биндинги к [формату конфигурации Ktav](https://
 сборки JNI на стороне потребителя**, обычный Gradle/Maven просто
 работает.
 
-Требуется **JDK 17+**. Пока распространяется через GitHub Releases
-(публикация в Maven Central — запланирована).
+Требуется **JDK 17+**. JAR публикуется в **Maven Central** как
+`io.github.ktav-lang:ktav` — release-workflow делает это с каждым тегом;
+нативный бинарник `ktav_cabi` один раз подгружается в runtime из
+соответствующего GitHub Release.
 
 >>>>> lang=zh
 # ktav — Java 绑定
@@ -56,6 +60,7 @@ Java-биндинги к [формату конфигурации Ktav](https://
 [JNA](https://github.com/java-native-access/jna) 动态加载 ——
 **使用方不需要编译 JNI**,常规的 Gradle/Maven 流程即可。
 
-需要 **JDK 17+**。目前通过 GitHub Releases 分发
-(已规划发布到 Maven Central)。
+需要 **JDK 17+**。JAR 由 release workflow 随每个 tag 发布到
+**Maven Central**（坐标 `io.github.ktav-lang:ktav`）；原生 `ktav_cabi`
+二进制则在运行时从对应的 GitHub Release 一次性获取。
 

@@ -102,6 +102,28 @@ public final class KtavException extends RuntimeException {
                 env.getSpecSection());
     }
 
+    /**
+     * Build a {@code KtavException} for a writer-time rejection of an
+     * unrepresentable {@link Value} (spec &sect; 5.9.0, required by spec
+     * &sect; 8.2). The binding raises these itself — see the
+     * {@code WriterPrecheck} walk for why they never reach the native
+     * writers — so there is no envelope to parse: the fields are filled
+     * in to match exactly what the core's own envelope contract
+     * specifies for {@code UnrepresentableAt} (no line/span/body/canonical
+     * — those describe source text, and a render refusal has no source
+     * text).
+     *
+     * <p>Package-private on purpose: the public API surface grows only by
+     * what callers actually invoke, and nobody outside {@code lang.ktav}
+     * constructs exceptions.
+     */
+    static KtavException unrepresentableAt(
+            String reason, List<String> path, String message) {
+        return new KtavException(message, "UnrepresentableAt", reason,
+                null, null, null, null, List.copyOf(path), null, null,
+                "§5.9.0");
+    }
+
     private static String describe(lang.ktav.internal.ErrorEnvelope env) {
         StringBuilder sb = new StringBuilder("Ktav error ").append(env.getError());
         String body = env.getBody();
