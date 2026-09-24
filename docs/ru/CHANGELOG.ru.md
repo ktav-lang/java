@@ -389,15 +389,15 @@ group/name: `io.github.ktav-lang:ktav`. Публикация в Maven Central �
 
 ### Маппинг типов
 
-|| Ktav             | вариант `Value`                                         |
-|| ---------------- | ------------------------------------------------------- |
-|| `null`           | `Value.Null.NULL`                                       |
-|| `true` / `false` | `Value.Bool`                                            |
-|| `:i <digits>`    | `Value.Int` (текстовая форма — произвольная точность)   |
-|| `:f <number>`    | `Value.Flt` (текстовая форма — точный round-trip)       |
-|| scalar без маркера | `Value.Str`                                           |
-|| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
-|| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
+| Ktav             | вариант `Value`                                         |
+| ---------------- | ------------------------------------------------------- |
+| `null`           | `Value.Null.NULL`                                       |
+| `true` / `false` | `Value.Bool`                                            |
+| `:i <digits>`    | `Value.Int` (текстовая форма — произвольная точность)   |
+| `:f <number>`    | `Value.Flt` (текстовая форма — точный round-trip)       |
+| scalar без маркера | `Value.Str`                                           |
+| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
+| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
 
 ### Платформы
 

@@ -339,15 +339,15 @@ group/name:`io.github.ktav-lang:ktav`。Maven Central 发布 ——
 
 ### 类型映射
 
-|| Ktav             | `Value` 变体                                             |
-|| ---------------- | ------------------------------------------------------- |
-|| `null`           | `Value.Null.NULL`                                       |
-|| `true` / `false` | `Value.Bool`                                            |
-|| `:i <digits>`    | `Value.Int`(文本形式 —— 任意精度)                      |
-|| `:f <number>`    | `Value.Flt`(文本形式 —— 精确往返)                      |
-|| 裸 scalar        | `Value.Str`                                             |
-|| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
-|| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
+| Ktav             | `Value` 变体                                             |
+| ---------------- | ------------------------------------------------------- |
+| `null`           | `Value.Null.NULL`                                       |
+| `true` / `false` | `Value.Bool`                                            |
+| `:i <digits>`    | `Value.Int`(文本形式 —— 任意精度)                      |
+| `:f <number>`    | `Value.Flt`(文本形式 —— 精确往返)                      |
+| 裸 scalar        | `Value.Str`                                             |
+| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
+| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
 
 ### 平台
 

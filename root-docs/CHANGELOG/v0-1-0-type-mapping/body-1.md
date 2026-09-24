@@ -24,15 +24,15 @@ Alpine (musl) is planned for a follow-up.
 >>>>> lang=ru
 ### Маппинг типов
 
-|| Ktav             | вариант `Value`                                         |
-|| ---------------- | ------------------------------------------------------- |
-|| `null`           | `Value.Null.NULL`                                       |
-|| `true` / `false` | `Value.Bool`                                            |
-|| `:i <digits>`    | `Value.Int` (текстовая форма — произвольная точность)   |
-|| `:f <number>`    | `Value.Flt` (текстовая форма — точный round-trip)       |
-|| scalar без маркера | `Value.Str`                                           |
-|| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
-|| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
+| Ktav             | вариант `Value`                                         |
+| ---------------- | ------------------------------------------------------- |
+| `null`           | `Value.Null.NULL`                                       |
+| `true` / `false` | `Value.Bool`                                            |
+| `:i <digits>`    | `Value.Int` (текстовая форма — произвольная точность)   |
+| `:f <number>`    | `Value.Flt` (текстовая форма — точный round-trip)       |
+| scalar без маркера | `Value.Str`                                           |
+| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
+| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
 
 ### Платформы
 
@@ -47,15 +47,15 @@ Alpine (musl) — в следующем релизе.
 >>>>> lang=zh
 ### 类型映射
 
-|| Ktav             | `Value` 变体                                             |
-|| ---------------- | ------------------------------------------------------- |
-|| `null`           | `Value.Null.NULL`                                       |
-|| `true` / `false` | `Value.Bool`                                            |
-|| `:i <digits>`    | `Value.Int`(文本形式 —— 任意精度)                      |
-|| `:f <number>`    | `Value.Flt`(文本形式 —— 精确往返)                      |
-|| 裸 scalar        | `Value.Str`                                             |
-|| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
-|| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
+| Ktav             | `Value` 变体                                             |
+| ---------------- | ------------------------------------------------------- |
+| `null`           | `Value.Null.NULL`                                       |
+| `true` / `false` | `Value.Bool`                                            |
+| `:i <digits>`    | `Value.Int`(文本形式 —— 任意精度)                      |
+| `:f <number>`    | `Value.Flt`(文本形式 —— 精确往返)                      |
+| 裸 scalar        | `Value.Str`                                             |
+| `[ ... ]`        | `Value.Arr` (`List<Value>`)                             |
+| `{ ... }`        | `Value.Obj` (`LinkedHashMap<String, Value>`)            |
 
 ### 平台
 
