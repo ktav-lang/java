@@ -3,6 +3,7 @@ package lang.ktav;
 import lang.ktav.internal.WireJson;
 
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.io.TempDir;
@@ -91,27 +92,14 @@ final class ConformanceTest {
     // ── Corpus layout: spec § 8.5 manifest compliance ───────────────────
 
     /**
-     * Validates the corpus against {@code tests/manifest.json} (spec
-     * &sect; 8.5): the manifest is the normative inventory of which
-     * category directories MUST exist, with how many fixtures each. This
-     * replaces the hand-rolled whitelist this runner used to carry — a
-     * stale or truncated corpus (a partially checked-out submodule, an
-     * old spec version's tests/) still has every category present and
-     * non-empty, so only the EXACT counts catch that we are running
-     * fewer cases than the corpus defines.
-     *
-     * <p>One dynamic test, not a passing skip: a runner whose corpus is
-     * unusable must say so loudly rather than report green.
+     * Validates the complete corpus before any factory enumerates
+     * fixtures (spec &sect; 8.5).
      */
-    @TestFactory
-    Stream<DynamicTest> manifest() throws IOException {
-        if (!TestPaths.cabiBuilt()) {
-            return Stream.of(failTest("manifest: cabi not built", CABI_MISSING));
-        }
-        if (!TestPaths.specPresent()) {
-            return Stream.of(failTest("manifest: spec submodule missing", SPEC_MISSING));
-        }
-        return Stream.of(DynamicTest.dynamicTest("manifest", ConformanceTest::runManifestGuard));
+    @BeforeAll
+    static void validateCorpusBeforeFixtures() throws IOException {
+        assertTrue(TestPaths.cabiBuilt(), CABI_MISSING);
+        assertTrue(TestPaths.specPresent(), SPEC_MISSING);
+        runManifestGuard();
     }
 
     /**
