@@ -22,9 +22,6 @@ public final class PureParser {
     /** Declared nesting-depth bound (multi-line + inline + dotted paths). */
     public static final int MAX_DEPTH = 256;
 
-    private PureParser() {
-    }
-
     private static final class Mline {
         final boolean verbatim;
         final Builders.Slot slot;
