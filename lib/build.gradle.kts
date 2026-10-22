@@ -60,15 +60,24 @@ val pureDeps by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("pure-lib"))
 }
 
-// Copy the COMPILED smoke checker itself into build/pure-check/ so the
-// direct CI java run (outside Gradle) can put it on -cp next to the
-// packaged jar and pure-lib. Without this, the direct run would fail
-// to find lang.ktav.PureSmokeMain.
-val pureCheckDeps by tasks.registering(Copy::class) {
+// Package the COMPILED smoke checker as a JAR into build/pure-check/ so
+// the direct CI java run (outside Gradle) can put it on -cp next to the
+// packaged jar and pure-lib. Java -cp wildcards expand JAR files ONLY —
+// a loose .class package tree under build/pure-check/ is not a valid
+// class root, so the checker must ship as an archive (e.g.
+// lib/build/pure-check/ktav-0.8.1-pure-check.jar).
+val pureCheckJar by tasks.registering(Jar::class) {
     group = "verification"
-    description = "Copies the compiled pure smoke checker (PureSmokeMain classes) into build/pure-check/."
+    description = "Packages the compiled pure smoke checker (PureSmokeMain classes) as a jar."
     dependsOn(tasks.named("compilePureCheckJava"))
     from(sourceSets["pureCheck"].output)
+    archiveClassifier.set("pure-check")
+}
+val pureCheckDeps by tasks.registering(Copy::class) {
+    group = "verification"
+    description = "Copies the pure smoke checker jar into build/pure-check/."
+    dependsOn(pureCheckJar)
+    from(pureCheckJar.flatMap { it.archiveFile })
     into(layout.buildDirectory.dir("pure-check"))
 }
 

@@ -149,45 +149,47 @@ final class PureFormatterEmitter {
     // ------------------------------------------------------------------
 
     /**
-     * Queue an Object's pairs (insertion order), each preceded by its
-     * slot's trivia run, then — when {@code close} — the {@code }}
-     * closer at {@code closeIndent} (the PAIR's indent for a nested
-     * body) and the compound's trailing trivia at the body indent. The
-     * root Object passes {@code close=false} (§ 5.9.3: no root closer).
+     * Queue an Object's body so its pop order — the EMISSION order —
+     * is exactly: (slotTrivia_k, PAIR_k) for k = first..last, then the
+     * trailing trivia, then the {@code }} closer (when {@code close}).
+     * Implemented by pushing in REVERSE INDEX order over a one-time
+     * ArrayList snapshot of {@code obj.pairs}: for i from last down to 0
+     * the PAIR is pushed before its TRIVIA, so the LIFO pop order is
+     * (slotTrivia, PAIR) per slot in insertion order, then trailing,
+     * then closer. The root Object passes {@code close=false} (§5.9.3:
+     * no root closer). {@code isRoot && i == 0} puts the rootFirstKey
+     * flag on insertion index 0, the FIRST EMITTED pair.
      */
     private static void expandObjectBody(ArrayDeque<Task> work,
             PureFormatter.PObj obj, int indent, boolean isRoot,
             boolean close, int closeIndent) {
-        // Pushed first ⇒ popped last: trailing trivia follows the pairs.
-        work.push(Task.trivia(obj.trailing, indent));
         if (close) {
             work.push(Task.literal("}\n", closeIndent));
         }
-        int index = obj.pairs.size();
-        for (Map.Entry<String, PureFormatter.Slot> e : obj.pairs
-                .entrySet()) {
-            index--;
-            // Per entry the pop order must be trivia-then-pair, so push
-            // the pair first and the trivia after it. Reverse iteration
-            // (via the countdown above) preserves insertion order.
+        work.push(Task.trivia(obj.trailing, indent));
+        List<Map.Entry<String, PureFormatter.Slot>> entries =
+                new ArrayList<>(obj.pairs.entrySet());
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            Map.Entry<String, PureFormatter.Slot> e = entries.get(i);
             work.push(Task.pair(e.getKey(), e.getValue().value, indent,
-                    isRoot && index == 0));
+                    isRoot && i == 0));
             work.push(Task.trivia(e.getValue().trivia, indent));
         }
     }
 
     /**
-     * Queue an Array's items (insertion order), each preceded by its
-     * slot's trivia run, then the {@code ]} closer at {@code closeIndent}
-     * and the trailing trivia at {@code indent}.
+     * Queue an Array's body with the same reversed-push discipline as
+     * {@link #expandObjectBody}: emission (pop) order is the items in
+     * insertion order each preceded by its slot trivia, then the
+     * trailing trivia, then the {@code ]} closer (when {@code close}).
      */
     private static void expandArrayItems(ArrayDeque<Task> work,
             PureFormatter.PArr arr, int indent, boolean close,
             int closeIndent) {
-        work.push(Task.trivia(arr.trailing, indent));
         if (close) {
             work.push(Task.literal("]\n", closeIndent));
         }
+        work.push(Task.trivia(arr.trailing, indent));
         for (int i = arr.items.size() - 1; i >= 0; i--) {
             PureFormatter.Slot slot = arr.items.get(i);
             work.push(Task.item(slot.value, indent, false));
@@ -215,14 +217,17 @@ final class PureFormatterEmitter {
         boolean needsWrap = firstIsCompound
                 || (arr.items.isEmpty() && !arr.trailing.isEmpty());
         if (needsWrap) {
-            // Items at indent 1, "]" closer at indent 0 (§ 5.9.3).
+            // Emission order: "[\n" at indent 0, (slotTrivia, ITEM) per
+            // item at indent 1, trailing trivia at indent 1, "]\n" at
+            // indent 0 (§ 5.9.3) — pushed in reverse.
             work.push(Task.literal("]\n", 0));
+            work.push(Task.trivia(arr.trailing, 1));
             for (int i = arr.items.size() - 1; i >= 0; i--) {
                 PureFormatter.Slot slot = arr.items.get(i);
                 work.push(Task.item(slot.value, 1, false));
                 work.push(Task.trivia(slot.trivia, 1));
             }
-            work.push(Task.trivia(arr.trailing, 1));
+            work.push(Task.literal("[\n", 0));
         } else {
             // § 5.9.6 / § 5.9.12: only index 0 of the unwrapped root
             // Array is exposed to root-kind detection.

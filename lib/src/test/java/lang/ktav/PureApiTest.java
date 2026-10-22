@@ -293,6 +293,82 @@ final class PureApiTest {
         assertEquals(once, lang.ktav.pure.PureKtav.format(once), "fixed point");
     }
 
+    // ── Formatter regressions (repair round 5: ordering / finish) ───────
+
+    @Test
+    void formatClosedExplicitArrayRootDoesNotCrash() {
+        // closeFrame pops the root frame and empties the stack; finish()
+        // must use the recorded completed root, never pop an empty stack.
+        assertEquals("1\n", lang.ktav.pure.PureKtav.format("[\n1\n]"));
+    }
+
+    @Test
+    void formatWrappedRootArrayEmitsBothBrackets() {
+        // Matches the independent oracle
+        // spec/versions/0.8/tests/valid/top_level_array/
+        // empty_compound_first_item.canonical.ktav
+        assertEquals("[\n    {}\n    2\n]\n",
+                lang.ktav.pure.PureKtav.format("[\n{}\n2\n]"));
+    }
+
+    @Test
+    void formatPreservesKeyOrderAndIsFixedPoint() {
+        String src = "a: 1\nb: 2\n";
+        assertEquals("a: 1\nb: 2\n", lang.ktav.pure.PureKtav.format(src));
+        String once = lang.ktav.pure.PureKtav.format(src);
+        assertEquals(once, lang.ktav.pure.PureKtav.format(once),
+                "format must be a fixed point");
+    }
+
+    @Test
+    void formatKeepsCommentBeforeNestedCloserInsideObject() {
+        String src = "o: {\n    m: 2\n    ## c\n}\n";
+        assertEquals(src, lang.ktav.pure.PureKtav.format(src),
+                "a comment immediately before the closer stays inside "
+                        + "the compound (emitted before '}')");
+    }
+
+    @Test
+    void formatKeepsTrailingCommentOnRootObject() {
+        String src = "a: 1\n## t\n";
+        String once = lang.ktav.pure.PureKtav.format(src);
+        assertEquals("a: 1\n## t\n", once);
+        assertEquals(once, lang.ktav.pure.PureKtav.format(once),
+                "fixed point with trailing root comment");
+    }
+
+    @Test
+    void formatQuotesRootFirstKeyStartingWithBom() {
+        // §5.9.10 rule (c): the first segment of the root Object's
+        // first-serialized key must be quoted when its decoded content
+        // begins with U+FEFF — bare form would put the raw UTF-8 BOM at
+        // byte offset 0, where §3.1 strips it. The opening '"' occupies
+        // byte 0 instead; U+FEFF itself needs no escape inside the
+        // quoted segment. The second key is unaffected.
+        String src = "\"\uFEFFkey\": 1\nk2: 2\n";
+        String once = lang.ktav.pure.PureKtav.format(src);
+        assertEquals("\"\uFEFFkey\": 1\nk2: 2\n", once,
+                "root-first BOM key must be quoted, second key untouched");
+        assertTrue(once.startsWith("\""),
+                "quoted key must place '\"' at byte offset 0");
+        assertEquals(once, lang.ktav.pure.PureKtav.format(once),
+                "fixed point with root-first BOM key");
+    }
+
+    @Test
+    void formatKeepsCommentsBeforeBothClosersInNestedMixedCompound() {
+        // §3.4 / §5.9: trailing comments belong to the compound they
+        // precede the closer of; a well-formed document formats to
+        // itself with each comment emitted before its own closer.
+        String src = "o: {\n    a: [\n        1\n"
+                + "        ## inner\n    ]\n    ## outer\n}\n";
+        assertEquals(src, lang.ktav.pure.PureKtav.format(src),
+                "comments stay inside their compounds, before each closer");
+        String once = lang.ktav.pure.PureKtav.format(src);
+        assertEquals(once, lang.ktav.pure.PureKtav.format(once),
+                "fixed point with comments before both closers");
+    }
+
     // ── Writer rejections (spec § 5.9.0 reason codes) ───────────────────
 
     @Test

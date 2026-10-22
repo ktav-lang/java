@@ -182,10 +182,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build jar + run pureJarTest (Gradle, jar + jackson-core only)
-        # pureCheckDeps copies the compiled smoke checker into
-        # build/pure-check/ for the direct java run below.
+        # pureCheckDeps packages the compiled smoke checker as a jar
+        # (pureCheckJar) and copies it into build/pure-check/ for the
+        # direct java run below. The checker MUST be a jar: a java -cp
+        # wildcard expands jar files only, never a loose .class tree.
         run: >
-          ./gradlew :lib:jar :lib:pureJarTest :lib:pureDeps :lib:pureCheckDeps
+          ./gradlew :lib:jar :lib:pureJarTest :lib:pureDeps :lib:pureCheckJar :lib:pureCheckDeps
           --no-daemon --stacktrace
 
       - name: Direct java run (no Gradle, same minimal classpath)

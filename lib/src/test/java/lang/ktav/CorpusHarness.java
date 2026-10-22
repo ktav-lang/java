@@ -105,16 +105,7 @@ final class CorpusHarness {
         // source list, so this guard is exactly the completeness proof
         // for that enumeration.
         Path validRoot = TestPaths.SPEC.resolve("valid");
-        for (Path src : collectKtavFiles(validRoot)) {
-            String name = src.getFileName().toString();
-            Path canonical = src.resolveSibling(
-                    name.substring(0, name.length() - ".ktav".length())
-                            + ".canonical.ktav");
-            assertTrue(Files.isRegularFile(canonical),
-                    "valid/ source fixture " + relativeName(validRoot, src)
-                            + " has no sibling .canonical.ktav — canonical coverage is"
-                            + " reduced (spec § 5.9.10) and the runner must not pass");
-        }
+        checkCanonicalCompanions(validRoot);
 
         Set<String> foundDirs;
         try (Stream<Path> dirs = Files.list(TestPaths.SPEC)) {
@@ -143,6 +134,29 @@ final class CorpusHarness {
                     "category " + category + " holds " + actual
                             + " fixture(s) but manifest.json declares " + expected
                             + " (spec § 8.5) — the corpus and its manifest must move together");
+        }
+    }
+
+    /**
+     * Canonical-companion coverage: EVERY valid/ source must have a
+     * sibling {@code .canonical.ktav} (spec § 5.9.10). A missing
+     * companion silently reduces canonical coverage — hard failure
+     * naming the fixture. canonicalFixtures() still iterates from the
+     * same source list, so this guard is exactly the completeness proof
+     * for that enumeration. Package-private (and root-parameterized)
+     * so the mutation suite can exercise it against a synthetic tree
+     * without touching the real corpus.
+     */
+    static void checkCanonicalCompanions(Path validRoot) throws IOException {
+        for (Path src : collectKtavFiles(validRoot)) {
+            String name = src.getFileName().toString();
+            Path canonical = src.resolveSibling(
+                    name.substring(0, name.length() - ".ktav".length())
+                            + ".canonical.ktav");
+            assertTrue(Files.isRegularFile(canonical),
+                    "valid/ source fixture " + relativeName(validRoot, src)
+                            + " has no sibling .canonical.ktav — canonical coverage is"
+                            + " reduced (spec § 5.9.10) and the runner must not pass");
         }
     }
 

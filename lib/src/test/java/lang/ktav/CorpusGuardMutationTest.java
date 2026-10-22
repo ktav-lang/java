@@ -122,4 +122,46 @@ final class CorpusGuardMutationTest {
                         + " \"flags\": [\"raw_bytes\"]},\n", ""),
                 "exactly 9");
     }
+
+    // ── Canonical-companion guard (spec § 5.9.10) ──────────────────────
+    //
+    // Exercised against a SYNTHETIC valid/ tree via
+    // CorpusHarness.checkCanonicalCompanions — the real spec corpus is
+    // never read or written here.
+
+    /** Both twins present: the guard passes (control for the mutation). */
+    @Test
+    void canonicalCompanionsCompletePasses(@TempDir Path temp) throws IOException {
+        Path valid = temp.resolve("valid");
+        Files.createDirectories(valid);
+        writeKtav(valid.resolve("x.ktav"), "a: 1");
+        writeKtav(valid.resolve("x.canonical.ktav"), "a: 1");
+        CorpusHarness.checkCanonicalCompanions(valid);
+    }
+
+    /** A valid/ source WITHOUT its .canonical.ktav twin is named. */
+    @Test
+    void missingCanonicalCompanionIsNamed(@TempDir Path temp) throws IOException {
+        Path valid = temp.resolve("valid");
+        Files.createDirectories(valid);
+        writeKtav(valid.resolve("x.ktav"), "a: 1");
+        writeKtav(valid.resolve("x.canonical.ktav"), "a: 1");
+        writeKtav(valid.resolve("y.ktav"), "b: 2"); // the mutation: no twin
+        try {
+            CorpusHarness.checkCanonicalCompanions(valid);
+        } catch (AssertionError e) {
+            for (String fragment : new String[] {"y.ktav", "canonical"}) {
+                assertTrue(String.valueOf(e.getMessage()).contains(fragment),
+                        "diagnostic must name the twinless fixture; expected fragment \""
+                                + fragment + "\" in: " + e.getMessage());
+            }
+            return;
+        }
+        throw new AssertionError(
+                "valid/ source without a .canonical.ktav twin must be rejected");
+    }
+
+    private static void writeKtav(Path p, String body) throws IOException {
+        Files.write(p, body.getBytes(StandardCharsets.UTF_8));
+    }
 }

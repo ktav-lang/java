@@ -198,6 +198,7 @@ final class PureFormatter {
     private boolean rootSet;
     private boolean rootDone;
     private boolean rootExplicit;
+    private PNode completedRoot; // explicit root already popped by closeFrame/mlLine
 
     private PureFormatter(byte[] b, int start) {
         this.ctx = new Ctx(b, start, false); // the formatter is never strict
@@ -366,7 +367,7 @@ final class PureFormatter {
             return;
         }
         if (te - ts == 1 && (c == '}' || c == ']')) {
-            throw unbalanced(c);
+            throw unbalanced((char) c);
         }
         // § 5.0.1 rule 6: pair candidate (shape-only phase-1 test).
         Keys.ColonResult cr = Keys.scanColon(b, ts, te);
@@ -401,7 +402,7 @@ final class PureFormatter {
     // Compound close / orphan / errors
     // ------------------------------------------------------------------
 
-    private void closeFrame(int wantKind, byte closer) {
+    private void closeFrame(int wantKind, char closer) {
         Frame top = stack.peek();
         boolean closable = top.kind == wantKind
                 && (stack.size() > 1 || top.explicit);
@@ -412,13 +413,18 @@ final class PureFormatter {
         stack.pop();
         if (stack.isEmpty()) {
             rootDone = true;
+            // Record the completed root explicitly: finish() must NEVER
+            // pop an empty stack (P1 fix — NoSuchElementException on a
+            // closed explicit root like "[\n1\n]").
+            completedRoot = top.kind == Frame.OBJ
+                    ? PNode.of(top.obj) : PNode.of(top.arr);
         }
     }
 
-    private SourceError unbalanced(byte found) {
+    private SourceError unbalanced(char found) {
         return ctx.syntax("UnbalancedBracket", "§6.1",
                 "UnbalancedBracket at line " + ctx.line + ": unexpected '"
-                        + (char) found + "'");
+                        + found + "'");
     }
 
     private SourceError orphan() {
@@ -753,9 +759,10 @@ final class PureFormatter {
                 : (te - ts == 1 && b[ts] == ')');
         if (isCloser) {
             stack.pop();
-            ml.holder.set(buildMultiline(ml));
+            ml.holder.set(new Value.Str(buildMultiline(ml)));
             if (stack.isEmpty()) {
                 rootDone = true;
+                completedRoot = ml.holder.slot.value; // defensive: an ML string never opens as the root
             }
             return;
         }
@@ -864,6 +871,24 @@ final class PureFormatter {
     // EOF
     // ------------------------------------------------------------------
 
+    /**
+     * EOF. Explicit enumeration of the terminal states — in priority
+     * order:
+     * <ol>
+     * <li>any remaining ML or explicit frame → UnclosedCompound (open
+     *     multiline string / unfinished explicit root);</li>
+     * <li>{@code rootInline != null} → the inline root;</li>
+     * <li>{@code completedRoot != null} → an explicit root that
+     *     closeFrame (or, defensively, mlLine) already popped — the
+     *     stack is empty here, so popping would crash;</li>
+     * <li>stack non-empty (implicit frames only survive the loop) →
+     *     pop the single implicit root frame, as before;</li>
+     * <li>{@code !rootSet} → empty / comments-only document: empty
+     *     Object root, all trivia as leading.</li>
+     * </ol>
+     * The empty-document substitution is reached only when nothing was
+     * ever parsed (no rootInline, no completedRoot, no frames).
+     */
     private FmtDoc finish() {
         for (Frame f : stack) {
             if (f.kind == Frame.ML || f.explicit) {
@@ -878,18 +903,22 @@ final class PureFormatter {
             attachTrailing(rootInline, eofTrivia);
             return new FmtDoc(docLeading, rootInline);
         }
-        if (!rootSet) {
-            // Empty / comments-only document: empty Object root; all
-            // trivia becomes the document's leading trivia.
-            ArrayList<TriviaLine> leading = docLeading;
-            leading.addAll(eofTrivia);
-            return new FmtDoc(leading, PNode.of(new PObj()));
+        if (completedRoot != null) {
+            attachTrailing(completedRoot, eofTrivia);
+            return new FmtDoc(docLeading, completedRoot);
         }
-        Frame rootFrame = stack.pop();
-        PNode root = rootFrame.kind == Frame.OBJ
-                ? PNode.of(rootFrame.obj) : PNode.of(rootFrame.arr);
-        attachTrailing(root, eofTrivia);
-        return new FmtDoc(docLeading, root);
+        if (!stack.isEmpty()) {
+            Frame rootFrame = stack.pop();
+            PNode root = rootFrame.kind == Frame.OBJ
+                    ? PNode.of(rootFrame.obj) : PNode.of(rootFrame.arr);
+            attachTrailing(root, eofTrivia);
+            return new FmtDoc(docLeading, root);
+        }
+        // Empty / comments-only document: empty Object root; all
+        // trivia becomes the document's leading trivia.
+        ArrayList<TriviaLine> leading = docLeading;
+        leading.addAll(eofTrivia);
+        return new FmtDoc(leading, PNode.of(new PObj()));
     }
 
     private static void attachTrailing(PNode root,

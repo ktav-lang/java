@@ -262,9 +262,9 @@ Since 0.8.1 the library ships a second, pure-Java backend in the
 | `PureKtav.format(String)` | Normalise a document's spelling, keeping comments. Output line endings are always LF-only (LF, CR, and CRLF inputs are all accepted). |
 | `PureKtav.version()` | Version of the pure backend — the spec version it implements. |
 
-The facade mirrors `Ktav` operation-for-operation and produces the same
-`Value` tree and the same `KtavException` envelopes, so code written
-against one backend reads unchanged against the other. There is no
+The facade mirrors `Ktav` operation-for-operation and is designed to
+produce the same `Value` tree and the same `KtavException` envelopes,
+so code written against one backend reads unchanged against the other. There is no
 global backend switch: you choose a backend explicitly by calling
 `Ktav` (native) or `PureKtav` (pure).
 
@@ -279,8 +279,8 @@ inline recursion, dotted-path length) is bounded by 256
 (`PureParser.MAX_DEPTH`), and scalars live in the i64 / binary64
 domains, exactly like the native core. The bound applies to PARSING
 only — the writers are iterative and emit arbitrarily deep trees
-without a depth limit. Canonical output is byte-pinned against the
-native backend by `CrossBackendTest`; the other writers match the
+without a depth limit. Byte-for-byte canonical equality with the
+native backend is the contract enforced by `CrossBackendTest` in CI; the other writers follow the
 reference writer's documented layout (4-space indent, insertion order,
 § 5.9.10 key form selection).
 

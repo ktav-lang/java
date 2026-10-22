@@ -196,7 +196,7 @@ public final class PureParser {
         }
         if (te - ts == 1 && (c == '}' || c == ']')) {
             // § 5.0.1 rule 8 — bare close as the first content line.
-            throw unbalanced(c);
+            throw unbalanced((char) c);
         }
         // § 5.0.1 rule 6: pair candidate (shape-only phase-1 test).
         Keys.ColonResult cr = Keys.scanColon(b, ts, te);
@@ -235,7 +235,7 @@ public final class PureParser {
     // Compound close / orphan / errors
     // ------------------------------------------------------------------
 
-    private void closeCompound(int wantKind, byte closer) {
+    private void closeCompound(int wantKind, char closer) {
         Frame top = stack.peek();
         boolean closable = top.kind == wantKind
                 && (stack.size() > 1 || top.explicit);
@@ -248,10 +248,10 @@ public final class PureParser {
         }
     }
 
-    private SourceError unbalanced(byte found) {
+    private SourceError unbalanced(char found) {
         return ctx.syntax("UnbalancedBracket", "§6.1",
                 "UnbalancedBracket at line " + ctx.line + ": unexpected '"
-                        + (char) found + "'");
+                        + found + "'");
     }
 
     private SourceError orphan() {

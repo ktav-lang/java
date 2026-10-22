@@ -15,9 +15,9 @@ Since 0.8.1 the library ships a second, pure-Java backend in the
 | `PureKtav.format(String)` | Normalise a document's spelling, keeping comments. Output line endings are always LF-only (LF, CR, and CRLF inputs are all accepted). |
 | `PureKtav.version()` | Version of the pure backend — the spec version it implements. |
 
-The facade mirrors `Ktav` operation-for-operation and produces the same
-`Value` tree and the same `KtavException` envelopes, so code written
-against one backend reads unchanged against the other. There is no
+The facade mirrors `Ktav` operation-for-operation and is designed to
+produce the same `Value` tree and the same `KtavException` envelopes,
+so code written against one backend reads unchanged against the other. There is no
 global backend switch: you choose a backend explicitly by calling
 `Ktav` (native) or `PureKtav` (pure).
 
@@ -32,8 +32,8 @@ inline recursion, dotted-path length) is bounded by 256
 (`PureParser.MAX_DEPTH`), and scalars live in the i64 / binary64
 domains, exactly like the native core. The bound applies to PARSING
 only — the writers are iterative and emit arbitrarily deep trees
-without a depth limit. Canonical output is byte-pinned against the
-native backend by `CrossBackendTest`; the other writers match the
+without a depth limit. Byte-for-byte canonical equality with the
+native backend is the contract enforced by `CrossBackendTest` in CI; the other writers follow the
 reference writer's documented layout (4-space indent, insertion order,
 § 5.9.10 key form selection).
 
@@ -54,9 +54,10 @@ reference writer's documented layout (4-space indent, insertion order,
 | `PureKtav.format(String)` | Нормализовать написание документа, сохраняя комментарии. Переводы строк в выводе — всегда только LF (на входе принимаются LF, CR и CRLF). |
 | `PureKtav.version()` | Версия чистого бэкенда — реализованная им версия спецификации. |
 
-Фасад повторяет `Ktav` операция в операцию и даёт то же дерево `Value`
-и те же конверты `KtavException`, поэтому код, написанный против одного
-бэкенда, против другого читается без изменений. Глобального
+Фасад повторяет `Ktav` операция в операцию и спроектирован так, чтобы
+давать то же дерево `Value` и те же конверты `KtavException`, поэтому
+код, написанный против одного бэкенда, против другого читается без
+изменений. Глобального
 переключателя бэкендов нет: бэкенд выбирается явно — вызовом `Ktav`
 (нативный) или `PureKtav` (чистый).
 
@@ -71,8 +72,8 @@ reference writer's documented layout (4-space indent, insertion order,
 (`PureParser.MAX_DEPTH`), а скаляры живут в доменах i64 / binary64 —
 в точности как в нативном ядре. Ограничение действует только при
 ПАРСИНГЕ — райтеры итеративны и выводят деревья произвольной глубины
-без лимита. Канонический вывод побайтово зафиксирован против нативного
-бэкенда тестом `CrossBackendTest`; остальные райтеры следуют
+без лимита. Побайтовое каноническое равенство с нативным бэкендом —
+это контракт, который тест `CrossBackendTest` проверяет в CI; остальные райтеры следуют
 задокументированной раскладке эталонного райтера (отступ в 4 пробела,
 порядок вставки, выбор формы ключей по § 5.9.10).
 
@@ -93,7 +94,7 @@ reference writer's documented layout (4-space indent, insertion order,
 | `PureKtav.format(String)` | 规范化文档写法，保留注释。输出的换行符始终只有 LF（输入接受 LF、CR 和 CRLF）。 |
 | `PureKtav.version()` | 纯后端版本 —— 其实现的规范版本。 |
 
-该门面逐操作镜像 `Ktav`，产出相同的 `Value` 树和相同的
+该门面逐操作镜像 `Ktav`，其设计目标是产出相同的 `Value` 树和相同的
 `KtavException` 信封，因此针对一个后端编写的代码，换到另一个后端
 无需改动。没有全局后端开关：后端通过显式调用选择 —— `Ktav`
 （原生）或 `PureKtav`（纯）。
@@ -106,7 +107,6 @@ reference writer's documented layout (4-space indent, insertion order,
 纯后端的限制：嵌套深度（多行复合框架、inline 递归、dotted 路径
 长度）以 256 为界（`PureParser.MAX_DEPTH`）；标量位于 i64 / binary64
 域，与原生核心完全一致。该限制只作用于解析——写入器是迭代的，
-输出任意深度的树都没有深度限制。规范输出由 `CrossBackendTest` 与
-原生后端逐字节对照；其余写入器遵循参考写入器的文档化布局
+输出任意深度的树都没有深度限制。与原生后端逐字节一致的规范输出是由 `CrossBackendTest` 在 CI 中检查的契约；其余写入器遵循参考写入器的文档化布局
 （4 空格缩进、插入顺序、§ 5.9.10 键形式选择）。
 
