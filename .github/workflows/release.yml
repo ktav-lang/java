@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/check-publish-metadata.sh
-          for jar in ktav-0.8.1.jar ktav-0.8.1-sources.jar ktav-0.8.1-javadoc.jar; do
+          for jar in ktav-0.8.1.jar ktav-0.8.1-sources.jar lib-maven-javadoc-0.8.1-javadoc.jar; do
             test -s "lib/build/libs/$jar" || { echo "missing JAR: $jar" >&2; exit 1; }
           done
 
@@ -187,7 +187,7 @@ jobs:
           path: |
             lib/build/libs/ktav-0.8.1.jar
             lib/build/libs/ktav-0.8.1-sources.jar
-            lib/build/libs/ktav-0.8.1-javadoc.jar
+            lib/build/libs/lib-maven-javadoc-0.8.1-javadoc.jar
           if-no-files-found: error
 
   # ------------------------------------------------------------------
