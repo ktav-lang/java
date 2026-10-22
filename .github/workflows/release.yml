@@ -13,6 +13,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  verify-acceptance:
+    name: Verify accepted tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require the package version and successful full CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = v0.8.1 || { echo 'tag does not match package version' >&2; exit 1; }
+          target="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq '.sha')"
+          test "$target" = "$GITHUB_SHA" || { echo 'tag does not match the built commit' >&2; exit 1; }
+          accepted="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+            --commit "$GITHUB_SHA" --status success --limit 20 --json databaseId --jq 'length')"
+          test "$accepted" -gt 0 || { echo 'no successful full CI for this commit' >&2; exit 1; }
+
   # ------------------------------------------------------------------
   # Cross-compile the cdylib for six platforms. Each job uploads a
   # single asset named the way `NativeLoader.assetName()` expects.
@@ -81,13 +101,37 @@ jobs:
         with:
           tool: cargo-zigbuild
 
+      - name: Verify published Rust core provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          cargo update -p ktav --precise 0.8.1
+          python3 - <<'PY'
+          import tomllib
+          with open('Cargo.lock', 'rb') as source:
+              packages = tomllib.load(source)['package']
+          core = [package for package in packages if package['name'] == 'ktav']
+          if len(core) != 1:
+              raise SystemExit('expected exactly one ktav core')
+          expected = {
+              'version': '0.8.1',
+              'source': 'registry+https://github.com/rust-lang/crates.io-index',
+              'checksum': '7140dfe2fa6c320e74768cd6a637828c2d26f81746254f4fcd805f3993bd3fd5',
+          }
+          for field, value in expected.items():
+              if core[0].get(field) != value:
+                  raise SystemExit(f'ktav {field} mismatch: {core[0].get(field)!r}')
+          print('published ktav 0.8.1 core provenance verified')
+          PY
+
       - name: Build (zigbuild)
         if: matrix.settings.use-zigbuild
-        run: cargo zigbuild --release -p ktav-cabi --target ${{ matrix.settings.target }}.2.17
+        run: cargo zigbuild --locked --release -p ktav-cabi --target ${{ matrix.settings.target }}.2.17
 
       - name: Build (native)
         if: ${{ !matrix.settings.use-zigbuild }}
-        run: cargo build --release -p ktav-cabi --target ${{ matrix.settings.target }}
+        run: cargo build --locked --release -p ktav-cabi --target ${{ matrix.settings.target }}
 
       - name: Rename artifact
         shell: bash
@@ -124,12 +168,26 @@ jobs:
         # vanniktech maven-publish renames javadocJar to
         # mavenPlainJavadocJar, so we either ask for that explicitly or
         # let the publication-graph trigger the right task transitively.
-        run: ./gradlew :lib:jar :lib:sourcesJar :lib:mavenPlainJavadocJar --no-daemon
+        run: >
+          ./gradlew :lib:jar :lib:sourcesJar :lib:mavenPlainJavadocJar
+          :lib:generatePomFileForMavenPublication
+          :lib:generateMetadataFileForMavenPublication :lib:pureJarTest --no-daemon
+
+      - name: Verify publication metadata and exact JAR payload
+        run: |
+          set -euo pipefail
+          bash scripts/check-publish-metadata.sh
+          for jar in ktav-0.8.1.jar ktav-0.8.1-sources.jar ktav-0.8.1-javadoc.jar; do
+            test -s "lib/build/libs/$jar" || { echo "missing JAR: $jar" >&2; exit 1; }
+          done
 
       - uses: actions/upload-artifact@v4
         with:
           name: jars
-          path: lib/build/libs/*.jar
+          path: |
+            lib/build/libs/ktav-0.8.1.jar
+            lib/build/libs/ktav-0.8.1-sources.jar
+            lib/build/libs/ktav-0.8.1-javadoc.jar
           if-no-files-found: error
 
   # ------------------------------------------------------------------
@@ -140,7 +198,7 @@ jobs:
   # ------------------------------------------------------------------
   publish-maven:
     name: publish to Maven Central
-    needs: build-jars
+    needs: [build-native, build-jars, verify-acceptance]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -163,13 +221,18 @@ jobs:
           # PRIVATE KEY BLOCK-----` block). Passphrase is empty (key was
           # generated with %no-protection), so no GPG_PASSPHRASE secret.
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-        run: ./gradlew :lib:publishAndReleaseToMavenCentral --no-configuration-cache --no-daemon
+        run: |
+          set -euo pipefail
+          ./gradlew :lib:pureJarTest :lib:generatePomFileForMavenPublication \
+            :lib:generateMetadataFileForMavenPublication --no-configuration-cache --no-daemon
+          bash scripts/check-publish-metadata.sh
+          ./gradlew :lib:publishAndReleaseToMavenCentral --no-configuration-cache --no-daemon
 
   # ------------------------------------------------------------------
   # Attach artifacts to the GitHub Release matching the tag.
   # ------------------------------------------------------------------
   release:
-    needs: [build-native, build-jars]
+    needs: [build-native, build-jars, publish-maven, verify-acceptance]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
