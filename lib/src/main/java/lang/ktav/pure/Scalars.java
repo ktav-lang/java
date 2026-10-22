@@ -73,6 +73,12 @@ final class Scalars {
                 return Cls.open(Cls.OPEN_ML_VERBATIM);
             }
         }
+        if (hadEscape) {
+            // § 3.7 / § 5.2: a recognised escape anywhere in the body
+            // forces String, whatever the decoded bytes resemble —
+            // this check precedes the empty-paren and keyword forms.
+            return Cls.of(new Value.Str(body));
+        }
         if (body.equals("()") || body.equals("(())")) {
             return Cls.of(new Value.Str(""));
         }
@@ -84,11 +90,6 @@ final class Scalars {
         }
         if (body.equals("false")) {
             return Cls.of(Value.Bool.FALSE);
-        }
-        if (hadEscape) {
-            // § 3.7 / § 5.2: a recognised escape anywhere in the body
-            // forces String, whatever the decoded bytes resemble.
-            return Cls.of(new Value.Str(body));
         }
         if (hasRedundantLeadingZero(body)) {
             return Cls.of(new Value.Str(body));

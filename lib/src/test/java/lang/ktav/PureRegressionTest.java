@@ -9,6 +9,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -183,5 +184,84 @@ final class PureRegressionTest {
         LinkedHashMap<String, Value> m = new LinkedHashMap<>();
         m.put(key, value);
         return new Value.Obj(m);
+    }
+
+    // ── Task7 regressions: nested inline, scope errors, EOF unclosed ────
+
+    @Test
+    void nestedInlineObjectsParseExactlyAndRoundTrip() {
+        String src = "cfg: {outer: {middle: {inner: deep}}}\n";
+        Value expected = obj("cfg", obj("outer",
+                obj("middle", obj("inner", new Value.Str("deep")))));
+        Value parsed = lang.ktav.pure.PureKtav.loads(src);
+        assertTrue(CorpusHarness.valueEquals(expected, parsed),
+                "nested inline objects tree: " + parsed);
+        String canonical = "cfg: {\n    outer: {\n        middle: {\n"
+                + "            inner: deep\n        }\n    }\n}\n";
+        assertEquals(canonical, lang.ktav.pure.PureKtav.emitCanonical(parsed));
+        assertEquals(canonical, lang.ktav.pure.PureKtav.canonicalFromSource(src));
+        assertTrue(CorpusHarness.valueEquals(expected,
+                lang.ktav.pure.PureKtav.loads(canonical)));
+    }
+
+    @Test
+    void arrayOfArraysParsesExactlyAndRoundTrip() {
+        String src = "matrix: [[1, 2], [3, 4], [5, 6]]\n";
+        Value expected = obj("matrix", new Value.Arr(List.of(
+                new Value.Arr(List.of(new Value.Int("1"), new Value.Int("2"))),
+                new Value.Arr(List.of(new Value.Int("3"), new Value.Int("4"))),
+                new Value.Arr(List.of(new Value.Int("5"), new Value.Int("6"))))));
+        Value parsed = lang.ktav.pure.PureKtav.loads(src);
+        assertTrue(CorpusHarness.valueEquals(expected, parsed),
+                "array-of-arrays tree: " + parsed);
+        String canonical = "matrix: [\n    [\n        1\n        2\n    ]\n"
+                + "    [\n        3\n        4\n    ]\n"
+                + "    [\n        5\n        6\n    ]\n]\n";
+        assertEquals(canonical, lang.ktav.pure.PureKtav.emitCanonical(parsed));
+        assertEquals(canonical, lang.ktav.pure.PureKtav.canonicalFromSource(src));
+        assertTrue(CorpusHarness.valueEquals(expected,
+                lang.ktav.pure.PureKtav.loads(canonical)));
+    }
+
+    @Test
+    void unclosedNonRootArraySpansOpenerToEof() {
+        // '[' находится на байте 5, длина исходника — 11 байтов.
+        KtavException e = assertThrows(KtavException.class,
+                () -> lang.ktav.pure.PureKtav.loads("arr: [\n1\n2\n"));
+        assertEquals("UnclosedCompound", e.getError());
+        assertEquals(5L, e.getSpanStart());
+        assertEquals(11L, e.getSpanEnd());
+    }
+
+    @Test
+    void unclosedNonRootObjectSpansOpenerToEof() {
+        // '{' находится на байте 5, длина исходника — 12 байтов.
+        KtavException e = assertThrows(KtavException.class,
+                () -> lang.ktav.pure.PureKtav.loads("obj: {\na: 1\n"));
+        assertEquals("UnclosedCompound", e.getError());
+        assertEquals(5L, e.getSpanStart());
+        assertEquals(12L, e.getSpanEnd());
+    }
+
+    @Test
+    void unclosedNestedArrayInsideExplicitRootReportsInnermostOpener() {
+        KtavException e = assertThrows(KtavException.class,
+                () -> lang.ktav.pure.PureKtav.loads("[\n[\n1\n"));
+        assertEquals("UnclosedCompound", e.getError());
+        assertEquals(2L, e.getSpanStart());
+        assertEquals(6L, e.getSpanEnd());
+    }
+
+    @Test
+    void implicitPairRootWithoutClosersStillParses() {
+        Value parsed = lang.ktav.pure.PureKtav.loads("a: 1\nb: 2\n");
+        LinkedHashMap<String, Value> expected = new LinkedHashMap<>();
+        expected.put("a", new Value.Int("1"));
+        expected.put("b", new Value.Int("2"));
+        assertTrue(CorpusHarness.valueEquals(new Value.Obj(expected), parsed),
+                "implicit root must not require a closer");
+        Value.Obj top = assertInstanceOf(Value.Obj.class, parsed);
+        assertEquals(new Value.Int("1"), top.entries().get("a"));
+        assertEquals(new Value.Int("2"), top.entries().get("b"));
     }
 }

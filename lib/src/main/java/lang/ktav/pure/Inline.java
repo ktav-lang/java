@@ -106,7 +106,7 @@ final class Inline {
                         "leading or doubled comma at pair position");
             }
             // Pair: key ':' / key '::' value
-            Keys.ColonResult cr = Keys.scanColon(b, i, end);
+            Keys.ColonResult cr = scanPairColon(b, i, end);
             if (cr.kind == Keys.Colon.UNTERMINATED) {
                 throw ctx.unterminatedInline();
             }
@@ -202,6 +202,44 @@ final class Inline {
         }
     }
 
+    /** Сканирует только ключ текущей пары; соседний scope не читается. */
+    private static Keys.ColonResult scanPairColon(byte[] b, int from, int end) {
+        int i = from;
+        boolean segmentStart = true;
+        while (i < end) {
+            if (segmentStart) {
+                i = Bytes.skipWs(b, i, end);
+                if (i >= end) {
+                    break;
+                }
+                if (Keys.isQuote(b[i])) {
+                    int close = Keys.quotedSpanEnd(b, i, end);
+                    if (close < 0) {
+                        return new Keys.ColonResult(Keys.Colon.UNTERMINATED, -1);
+                    }
+                    i = close + 1;
+                    segmentStart = false;
+                    continue;
+                }
+                segmentStart = false;
+            }
+            byte c = b[i];
+            if (c == '\\') {
+                i += 2;
+            } else if (c == '.') {
+                segmentStart = true;
+                i++;
+            } else if (c == ':') {
+                return new Keys.ColonResult(Keys.Colon.FOUND, i);
+            } else if (c == ',' || c == '}' || c == ']') {
+                break;
+            } else {
+                i++;
+            }
+        }
+        return new Keys.ColonResult(Keys.Colon.ABSENT, -1);
+    }
+
     /** Insert a parsed value under a (possibly dotted) inline-object key. */
     private static void insert(Ctx ctx, Builders.ObjBuilder out,
             Keys.RawPath key, Object value) {
@@ -224,13 +262,10 @@ final class Inline {
         while (i < end) {
             byte c = b[i];
             if (c == '\\') {
-                Escapes.validateAt(b, i, end, ctx.line, ctx.lineText,
-                        ctx.spanStart, ctx.spanEnd);
+                int escLen = Escapes.validateAt(b, i, end, ctx.line,
+                        ctx.lineText, ctx.spanStart, ctx.spanEnd);
                 hadEscape = true;
-                i += 2; // named forms advance 2; the u-form advances below
-                // Re-scan: the U+XXXX escape needs its full length consumed — but
-                // hex digits are never structural, so a conservative
-                // skip is safe for terminator finding.
+                i += escLen; // full length: 2 named, 6 unicode, 12 pair
                 continue;
             }
             if (c == ',' || c == '}' || c == ']') {

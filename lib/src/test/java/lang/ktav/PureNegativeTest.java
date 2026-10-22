@@ -282,13 +282,37 @@ final class PureNegativeTest {
 
     @Test
     void nestingBeyondTheBoundIsAnExplicitErrorNotAStackOverflow() {
-        StringBuilder deep = new StringBuilder();
-        for (int i = 0; i < lang.ktav.pure.PureParser.MAX_DEPTH + 10; i++) {
-            deep.append("k: [\n");
+        // Balanced chain: the root '[' explicit frame plus MAX_DEPTH-1
+        // nested openers fill the stack to exactly MAX_DEPTH frames and
+        // still parse; one MORE opener exceeds the bound (pushDepth
+        // throws when stack.size()+1 > MAX_DEPTH) and must fail with an
+        // explicit Other error BEFORE any closer line is reached.
+        int atLimit = lang.ktav.pure.PureParser.MAX_DEPTH - 1;
+        StringBuilder ok = new StringBuilder("[\n");
+        for (int i = 0; i < atLimit; i++) {
+            ok.append("[\n");
         }
-        KtavException e = err(deep.toString());
-        assertEquals("Other", e.getError(),
-                "depth exhaustion must be an explicit Other error");
+        ok.append("1\n");
+        for (int i = 0; i < atLimit; i++) {
+            ok.append("]\n");
+        }
+        ok.append("]\n");
+        Value v = lang.ktav.pure.PureKtav.loads(ok.toString());
+        for (int i = 0; i <= atLimit; i++) {
+            v = assertInstanceOf(Value.Arr.class, v).items().get(0);
+        }
+        assertEquals(new Value.Int("1"), v);
+
+        StringBuilder over = new StringBuilder("[\n");
+        for (int i = 0; i <= atLimit; i++) {
+            over.append("[\n");
+        }
+        over.append("1\n");
+        for (int i = 0; i <= atLimit; i++) {
+            over.append("]\n");
+        }
+        over.append("]\n");
+        assertEquals("Other", err(over.toString()).getError());
     }
 
     @Test

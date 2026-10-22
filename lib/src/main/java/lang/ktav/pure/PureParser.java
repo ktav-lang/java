@@ -365,13 +365,13 @@ public final class PureParser {
             slot.set(child);
             pushDepth();
             stack.push(new Frame(Frame.OBJ, false, child, null, null,
-                    ctx.spanStart, ctx.line));
+                    ctx.spanEnd - 1, ctx.line));
         } else {
             Builders.ArrBuilder child = new Builders.ArrBuilder();
             slot.set(child);
             pushDepth();
             stack.push(new Frame(Frame.ARR, false, null, child, null,
-                    ctx.spanStart, ctx.line));
+                    ctx.spanEnd - 1, ctx.line));
         }
     }
 
@@ -487,7 +487,7 @@ public final class PureParser {
                 : (t[1] - t[0] == 1 && b[t[0]] == ')');
         if (isCloser) {
             stack.pop();
-            ml.slot.set(buildMultiline(ml));
+            ml.slot.set(new Value.Str(buildMultiline(ml)));
             if (stack.isEmpty()) {
                 rootDone = true;
             }
@@ -608,13 +608,24 @@ public final class PureParser {
         // Unclosed explicit roots, non-root compounds, and open
         // multi-line strings are UnclosedCompound (§ 6.1); an implicit
         // root needs no closer (0.8.1 errata).
-        for (Frame f : stack) {
-            if (f.kind == Frame.ML || f.explicit) {
-                throw SourceError.unpositioned("UnclosedCompound", "§6.1",
-                        f.openerOffset, ctx.b.length,
-                        "UnclosedCompound: compound opened at line "
-                                + f.openerLine + " is never closed");
+        //
+        // ArrayDeque.push adds at the HEAD, so toArray() yields
+        // innermost→outermost and the BOTTOM (root) frame is the LAST
+        // array element. Only a bottom frame that is neither a
+        // multi-line string nor explicit may stay open at EOF; every
+        // other open frame is an unclosed compound spanning its opener
+        // to EOF.
+        Frame[] frames = stack.toArray(new Frame[0]);
+        for (int idx = 0; idx < frames.length; idx++) {
+            Frame f = frames[idx];
+            if (idx == frames.length - 1 && f.kind != Frame.ML
+                    && !f.explicit) {
+                continue; // implicit root needs no closer (0.8.1 errata)
             }
+            throw SourceError.unpositioned("UnclosedCompound", "§6.1",
+                    f.openerOffset, ctx.b.length,
+                    "UnclosedCompound: compound opened at line "
+                            + f.openerLine + " is never closed");
         }
         if (!rootSet) {
             rootValue = new Builders.ObjBuilder(); // empty Object root

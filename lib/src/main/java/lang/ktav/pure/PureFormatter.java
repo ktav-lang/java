@@ -499,13 +499,41 @@ final class PureFormatter {
                 throw ctx.malformedInline(
                         "content after the compound's closer");
             }
-            insertLeaf(key, trivia, Builders.toValue(p.value, 0));
+            insertLeaf(key, trivia, toPNode(p.value));
             return;
         }
         Scalars.Cls cl = Scalars.classify(Bytes.text(b, vs, ve), false,
                 true, ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd,
                 ctx.strict);
         dispatchScalarBody(key, trivia, cl, null);
+    }
+
+    /**
+     * Convert an Inline-parsed builder tree into formatter nodes so
+     * dotted-key walk can descend into inline compounds like the Rust
+     * shared insert path does (a blocked SCALAR prefix conflicts; an
+     * inline OBJECT prefix is descendable).
+     */
+    private static PNode toPNode(Object o) {
+        if (o instanceof Builders.ObjBuilder b) {
+            PObj out = new PObj();
+            for (var en : b.map.entrySet()) {
+                Slot s = new Slot();
+                s.value = toPNode(en.getValue());
+                out.pairs.put(en.getKey(), s);
+            }
+            return PNode.of(out);
+        }
+        if (o instanceof Builders.ArrBuilder b) {
+            PArr out = new PArr();
+            for (Object item : b.items) {
+                Slot s = new Slot();
+                s.value = toPNode(item);
+                out.items.add(s);
+            }
+            return PNode.of(out);
+        }
+        return PNode.of((Value) o);
     }
 
     /** Act on a classify() result in pair position ({@code slotKey} unused). */
