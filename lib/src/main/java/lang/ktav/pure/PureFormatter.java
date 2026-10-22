@@ -722,7 +722,6 @@ final class PureFormatter {
             ArrayList<TriviaLine> trivia, boolean verbatim) {
         Holder holder = new Holder();
         if (arrSlot != null) {
-            arrSlot.trivia.addAll(trivia);
             holder.slot = arrSlot;
         } else {
             holder.slot = resolveLeaf(key, trivia);

@@ -186,6 +186,17 @@ final class PureRegressionTest {
         return new Value.Obj(m);
     }
 
+    @Test
+    void multilineArrayItemKeepsItsCommentExactlyOnce() {
+        String source = "[\n## keep\n(\nbody\n)\n]\n";
+        String formatted = lang.ktav.pure.PureKtav.format(source);
+        assertTrue(formatted.contains("## keep"));
+        assertEquals(formatted.indexOf("## keep"), formatted.lastIndexOf("## keep"));
+        assertEquals(new Value.Arr(List.of(new Value.Str("body"))),
+                lang.ktav.pure.PureKtav.loads(formatted));
+        assertEquals(formatted, lang.ktav.pure.PureKtav.format(formatted));
+    }
+
     // ── Task7 regressions: nested inline, scope errors, EOF unclosed ────
 
     @Test

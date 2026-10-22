@@ -66,7 +66,7 @@ final class PureNegativeTest {
 
     @Test
     void unterminatedQuotedKeyIsRejected() {
-        KtavException e = err("\"ab: 1\n");
+        KtavException e = err("anchor: ok\n\"ab: 1\n");
         assertEquals("UnterminatedQuotedKey", e.getError());
         assertEquals("§6.16", e.getSpecSection());
     }
@@ -213,11 +213,19 @@ final class PureNegativeTest {
     }
 
     @Test
+    void firstLinesWithoutPairShapeRemainStringArrayItems() {
+        for (String body : List.of("a:1", "\"ab: 1")) {
+            assertEquals(new Value.Arr(List.of(new Value.Str(body))),
+                    lang.ktav.pure.PureKtav.loads(body + "\n"));
+        }
+    }
+
+    @Test
     void missingSeparatorSpaceIsRejectedWithLineText() {
-        KtavException e = err("a:1\n");
+        KtavException e = err("anchor: ok\na:1\n");
         assertEquals("MissingSeparatorSpace", e.getError());
         assertEquals("§6.10", e.getSpecSection());
-        assertEquals(1L, e.getLine());
+        assertEquals(2L, e.getLine());
         assertEquals("a:1", e.getLineText());
     }
 
@@ -275,7 +283,7 @@ final class PureNegativeTest {
                 lang.ktav.pure.PureKtav.loads("a: 1\nb: 2\n"),
                 lang.ktav.pure.PureKtav.loads("a: 1\rb: 2\r"));
         // lineText strips exactly one trailing CR (envelope convention).
-        assertEquals("a:1", err("a:1\r\n").getLineText());
+        assertEquals("a:1", err("anchor: ok\r\na:1\r\n").getLineText());
     }
 
     // ── Depth bound ─────────────────────────────────────────────────────
