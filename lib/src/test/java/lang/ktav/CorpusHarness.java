@@ -365,10 +365,9 @@ final class CorpusHarness {
     /**
      * Spec § 8.1 invalid/: exact error class per oracle. Fixtures the
      * manifest flags {@code raw_bytes} are deliberately not valid UTF-8
-     * (spec § 6.15): the String API rejects them at the byte → String
-     * boundary; a backend with a byte[] entry (pure) must instead reject
-     * them IN the parser with error {@code InvalidUtf8} and a non-empty
-     * span over the raw bytes.
+     * (spec § 6.15): the harness validates the flag with a strict decoder,
+     * then passes the original bytes to every backend's byte[] entry. Each
+     * backend must report {@code InvalidUtf8} with a non-empty raw-byte span.
      */
     static Stream<DynamicTest> invalidFixtures(Backend backend) throws IOException {
         requireCabiFor(backend);
@@ -400,16 +399,14 @@ final class CorpusHarness {
             }
             assertEquals("InvalidUtf8", expected,
                     "oracle for raw_bytes fixture " + ktavPath + " must expect InvalidUtf8");
-            if (backend.hasByteEntry()) {
-                KtavException e = assertThrowsKtav(() -> backend.loads(raw),
-                        "byte[] entry must reject invalid UTF-8: " + ktavPath);
-                assertEquals("InvalidUtf8", e.getError(),
-                        "error class for raw_bytes fixture " + ktavPath);
-                assertNotNull(e.getSpanStart(), "span start for " + ktavPath);
-                assertNotNull(e.getSpanEnd(), "span end for " + ktavPath);
-                assertTrue(e.getSpanEnd() > e.getSpanStart(),
-                        "InvalidUtf8 span must be non-empty: " + ktavPath);
-            }
+            KtavException e = assertThrowsKtav(() -> backend.loads(raw),
+                    "byte[] entry must reject invalid UTF-8: " + ktavPath);
+            assertEquals("InvalidUtf8", e.getError(),
+                    "error class for raw_bytes fixture " + ktavPath);
+            assertNotNull(e.getSpanStart(), "span start for " + ktavPath);
+            assertNotNull(e.getSpanEnd(), "span end for " + ktavPath);
+            assertTrue(e.getSpanEnd() > e.getSpanStart(),
+                    "InvalidUtf8 span must be non-empty: " + ktavPath);
             return;
         }
 

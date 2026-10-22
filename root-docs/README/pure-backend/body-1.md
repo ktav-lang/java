@@ -15,27 +15,15 @@ Since 0.8.1 the library ships a second, pure-Java backend in the
 | `PureKtav.format(String)` | Normalise a document's spelling, keeping comments. Output line endings are always LF-only (LF, CR, and CRLF inputs are all accepted). |
 | `PureKtav.version()` | Version of the pure backend — the spec version it implements. |
 
-The facade mirrors `Ktav` operation-for-operation and is designed to
-produce the same `Value` tree and the same `KtavException` envelopes,
-so code written against one backend reads unchanged against the other. There is no
-global backend switch: you choose a backend explicitly by calling
-`Ktav` (native) or `PureKtav` (pure).
+### Isolated pure-Java installation
 
-Pure mode never loads or downloads a native library — no JNA, no
-`ktav_cabi`, no cache directory, no network. It is the right choice for
-air-gapped environments, platforms without a prebuilt native asset, and
-anywhere a JVM-only dependency matters. The native backend remains the
-reference-tuned path.
+The combined artifact's build declares JNA 5.15.0 as `api` and jackson-core 2.18.2 as `implementation` for native ABI and JSON-wire support. Standard Maven/Gradle dependency resolution includes those dependencies, so the normal install is not zero-dependency. This describes the build declarations, not verified published metadata.
 
-Limits of the pure backend: nesting depth (multi-line compound frames,
-inline recursion, dotted-path length) is bounded by 256
-(`PureParser.MAX_DEPTH`), and scalars live in the i64 / binary64
-domains, exactly like the native core. The bound applies to PARSING
-only — the writers are iterative and emit arbitrarily deep trees
-without a depth limit. Byte-for-byte canonical equality with the
-native backend is the contract enforced by `CrossBackendTest` in CI; the other writers follow the
-reference writer's documented layout (4-space indent, insertion order,
-§ 5.9.10 key form selection).
+For pure-only Gradle use, disable transitive dependencies:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
 
 >>>>> lang=ru
 ## Чисто-Java бэкенд
@@ -54,28 +42,15 @@ reference writer's documented layout (4-space indent, insertion order,
 | `PureKtav.format(String)` | Нормализовать написание документа, сохраняя комментарии. Переводы строк в выводе — всегда только LF (на входе принимаются LF, CR и CRLF). |
 | `PureKtav.version()` | Версия чистого бэкенда — реализованная им версия спецификации. |
 
-Фасад повторяет `Ktav` операция в операцию и спроектирован так, чтобы
-давать то же дерево `Value` и те же конверты `KtavException`, поэтому
-код, написанный против одного бэкенда, против другого читается без
-изменений. Глобального
-переключателя бэкендов нет: бэкенд выбирается явно — вызовом `Ktav`
-(нативный) или `PureKtav` (чистый).
+### Изолированная установка чистого Java-бэкенда
 
-Чистый режим никогда не загружает и не скачивает нативную библиотеку —
-ни JNA, ни `ktav_cabi`, ни кэш-каталога, ни сети. Это правильный выбор
-для air-gapped-сред, платформ без готового нативного ассета и всюду,
-где важна JVM-only зависимость. Нативный бэкенд остаётся путём,
-настроенным по эталонной реализации.
+Сборка объединённого артефакта объявляет JNA 5.15.0 как `api` и jackson-core 2.18.2 как `implementation` для нативного ABI и JSON wire. Стандартное разрешение зависимостей Maven/Gradle включает эти зависимости, поэтому обычная установка не является установкой без зависимостей. Это описание объявлений сборки, а не проверенных опубликованных метаданных.
 
-Ограничения чистого бэкенда: глубина вложенности (многострочные рамки
-компаундов, inline-рекурсия, длина dotted-путей) ограничена 256
-(`PureParser.MAX_DEPTH`), а скаляры живут в доменах i64 / binary64 —
-в точности как в нативном ядре. Ограничение действует только при
-ПАРСИНГЕ — райтеры итеративны и выводят деревья произвольной глубины
-без лимита. Побайтовое каноническое равенство с нативным бэкендом —
-это контракт, который тест `CrossBackendTest` проверяет в CI; остальные райтеры следуют
-задокументированной раскладке эталонного райтера (отступ в 4 пробела,
-порядок вставки, выбор формы ключей по § 5.9.10).
+Для использования только чистого бэкенда в Gradle отключите транзитивные зависимости:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
 
 >>>>> lang=zh
 ## 纯 Java 后端
@@ -94,19 +69,13 @@ reference writer's documented layout (4-space indent, insertion order,
 | `PureKtav.format(String)` | 规范化文档写法，保留注释。输出的换行符始终只有 LF（输入接受 LF、CR 和 CRLF）。 |
 | `PureKtav.version()` | 纯后端版本 —— 其实现的规范版本。 |
 
-该门面逐操作镜像 `Ktav`，其设计目标是产出相同的 `Value` 树和相同的
-`KtavException` 信封，因此针对一个后端编写的代码，换到另一个后端
-无需改动。没有全局后端开关：后端通过显式调用选择 —— `Ktav`
-（原生）或 `PureKtav`（纯）。
+### 纯 Java 后端的独立安装
 
-纯模式从不加载或下载原生库 —— 没有 JNA、没有 `ktav_cabi`、没有缓存
-目录、没有网络。它适合离线（air-gapped）环境、没有预编译原生资产的
-平台，以及任何在乎纯 JVM 依赖的场景。原生后端仍是按参考实现调优的
-路径。
+合并制品的构建将 JNA 5.15.0 声明为 `api`，将 jackson-core 2.18.2 声明为 `implementation`，用于原生 ABI 和 JSON wire。标准 Maven/Gradle 依赖解析会包含这些依赖，因此常规安装并非零依赖安装。这里描述的是构建声明，并非已核实的发布元数据。
 
-纯后端的限制：嵌套深度（多行复合框架、inline 递归、dotted 路径
-长度）以 256 为界（`PureParser.MAX_DEPTH`）；标量位于 i64 / binary64
-域，与原生核心完全一致。该限制只作用于解析——写入器是迭代的，
-输出任意深度的树都没有深度限制。与原生后端逐字节一致的规范输出是由 `CrossBackendTest` 在 CI 中检查的契约；其余写入器遵循参考写入器的文档化布局
-（4 空格缩进、插入顺序、§ 5.9.10 键形式选择）。
+Gradle 纯后端用法可关闭传递依赖：
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
 

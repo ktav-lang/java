@@ -4,13 +4,17 @@
 | Function | Purpose |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Parse a Ktav document into the `Value` tree. |
+| `Ktav.loads(byte[]) -> Value` | Parse original UTF-8 bytes directly; invalid input is reported as `InvalidUtf8`. |
 | `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
+| `Ktav.loadsStrict(byte[]) -> Value` | Strictly parse original UTF-8 bytes, preserving invalid bytes for `InvalidUtf8` diagnostics. |
 | `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj` or `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Render like `dumps`, but coerce every leaf scalar to a String. |
 | `Ktav.emitCanonical(Value) -> String` | Render a `Value` as deterministic canonical form. |
 | `Ktav.format(String) -> String` | Normalise a document's spelling, keeping comments. |
 | `Ktav.canonicalFromSource(String) -> String` | Parse and re-emit as canonical Ktav in one call — `emitCanonical(loads(src))` with no intermediate `Value`. Drops comments and blank lines like `emitCanonical` does. |
 | `Ktav.nativeVersion() -> String` | Version string reported by the loaded `ktav_cabi`. |
+
+For raw-byte conformance fixtures, pass the original `byte[]` to `loads` or `loadsStrict` so the native parser can report `InvalidUtf8`; decoding a fixture first can reject it before Ktav sees it. Adding the `byte[]` overload means an uncast `Ktav.loads(null)` or `Ktav.loadsStrict(null)` is ambiguous at compile time; cast null to `String` or `byte[]` to select an overload. Either selected overload throws `NullPointerException("src")` for null.
 
 `toStringForceStrings` flattens integers, floats, booleans and `null` to
 their textual form via the raw marker (`::`); objects and arrays keep
@@ -24,13 +28,17 @@ downstream consumer does not understand typed scalars.
 | Функция | Назначение |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Разобрать Ktav-документ в дерево `Value`. |
+| `Ktav.loads(byte[]) -> Value` | Разобрать исходные UTF-8-байты напрямую; некорректный ввод дает `InvalidUtf8`. |
 | `Ktav.loadsStrict(String) -> Value` | Разобрать документ со строгой проверкой записи чисел. |
+| `Ktav.loadsStrict(byte[]) -> Value` | Строго разобрать исходные UTF-8-байты, сохранив некорректные байты для диагностики `InvalidUtf8`. |
 | `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj` или `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Отрендерить как `dumps`, но привести каждый leaf-скаляр к String. |
 | `Ktav.emitCanonical(Value) -> String` | Отрендерить `Value` в детерминированной канонической форме. |
 | `Ktav.format(String) -> String` | Нормализовать написание документа, сохраняя комментарии. |
 | `Ktav.canonicalFromSource(String) -> String` | Разобрать и заново вывести как канонический Ktav за один вызов — `emitCanonical(loads(src))` без промежуточного `Value`. Комментарии и пустые строки отбрасывает так же, как `emitCanonical`. |
 | `Ktav.nativeVersion() -> String` | Версия подгруженного `ktav_cabi`. |
+
+Для raw-byte fixtures передавайте исходный `byte[]` в `loads` или `loadsStrict`, чтобы native-парсер сообщил `InvalidUtf8`; предварительное декодирование может завершиться до вызова Ktav. После добавления перегрузки вызовы `Ktav.loads(null)` и `Ktav.loadsStrict(null)` без приведения неоднозначны при компиляции. Приведение к `String` или `byte[]` выбирает перегрузку; обе при null выбрасывают `NullPointerException("src")`.
 
 `toStringForceStrings` расплющивает целые, float, булевы и `null` в их
 текстовую форму через сырой маркер (`::`); объекты и массивы сохраняют
@@ -44,13 +52,17 @@ downstream consumer does not understand typed scalars.
 | 函数 | 作用 |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | 将 Ktav 文档解析为 `Value` 树。 |
+| `Ktav.loads(byte[]) -> Value` | 直接解析原始 UTF-8 字节；无效输入报告为 `InvalidUtf8`。 |
 | `Ktav.loadsStrict(String) -> Value` | 使用严格数字词法检查解析文档。 |
+| `Ktav.loadsStrict(byte[]) -> Value` | 严格解析原始 UTF-8 字节，并保留无效字节以报告 `InvalidUtf8`。 |
 | `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj` 或 `Arr`。 |
 | `Ktav.toStringForceStrings(Value) -> String` | 输出与 `dumps` 相同，但把每个叶子标量强制为 String。 |
 | `Ktav.emitCanonical(Value) -> String` | 将 `Value` 渲染为确定性的规范形式。 |
 | `Ktav.format(String) -> String` | 规范化文档的写法，同时保留注释。 |
 | `Ktav.canonicalFromSource(String) -> String` | 一次调用完成解析并重新输出为规范 Ktav —— 相当于 `emitCanonical(loads(src))`,但中间没有 `Value`。像 `emitCanonical` 一样丢弃注释与空行。 |
 | `Ktav.nativeVersion() -> String` | 已加载的 `ktav_cabi` 的版本字符串。 |
+
+对于 raw-byte 一致性测试，请将原始 `byte[]` 传给 `loads` 或 `loadsStrict`，让 native 解析器报告 `InvalidUtf8`；预先解码可能在 Ktav 收到数据前失败。添加 `byte[]` 重载后，未显式转换的 `Ktav.loads(null)` 和 `Ktav.loadsStrict(null)` 在编译时会有歧义。转换为 `String` 或 `byte[]` 可选择重载；两种类型的 null 都会抛出 `NullPointerException("src")`。
 
 `toStringForceStrings` 把整数、float、布尔与 `null` 用原始标记(`::`)
 压平为它们的文本形式；对象与数组保持自身结构，因为只有叶子会被强制。

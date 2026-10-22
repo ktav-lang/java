@@ -43,12 +43,13 @@ final class Builders {
      * reverse KeyPathConflict (§ 5.3.2). {@code plainKey} distinguishes
      * plain pairs from dotted-key leaves for that rule.
      */
-    static Slot leafSlot(ObjBuilder root, List<String> segments,
-            boolean plainKey, List<String> fullPath, int line,
+    static Slot leafSlot(ObjBuilder root, Keys.RawPath key,
+            boolean plainKey, int line,
             String lineText, int spanStart, int spanEnd) {
-        ObjBuilder parent = walk(root, segments, fullPath, line, lineText,
+        List<String> fullPath = new ArrayList<>(key.size());
+        ObjBuilder parent = walk(root, key, fullPath, line, lineText,
                 spanStart, spanEnd);
-        String last = segments.get(segments.size() - 1);
+        String last = fullPath.get(fullPath.size() - 1);
         Object existing = parent.map.get(last);
         if (existing != null) {
             if (plainKey && existing instanceof ObjBuilder b && b.synthetic) {
@@ -65,12 +66,13 @@ final class Builders {
      * KeyPathConflict (plain pair naming a dotted-established object),
      * anything else a DuplicateKey.
      */
-    static Slot compoundSlot(ObjBuilder root, List<String> segments,
-            List<String> fullPath, int line, String lineText,
+    static Slot compoundSlot(ObjBuilder root, Keys.RawPath key,
+            int line, String lineText,
             int spanStart, int spanEnd) {
-        ObjBuilder parent = walk(root, segments, fullPath, line, lineText,
+        List<String> fullPath = new ArrayList<>(key.size());
+        ObjBuilder parent = walk(root, key, fullPath, line, lineText,
                 spanStart, spanEnd);
-        String last = segments.get(segments.size() - 1);
+        String last = fullPath.get(fullPath.size() - 1);
         Object existing = parent.map.get(last);
         if (existing != null) {
             if (existing instanceof ObjBuilder b && b.synthetic) {
@@ -81,11 +83,18 @@ final class Builders {
         return v -> parent.map.put(last, v);
     }
 
-    /** Walk/create every intermediate object along {@code segments} minus the last. */
-    private static ObjBuilder walk(ObjBuilder root, List<String> segments,
-            List<String> fullPath, int line, String lineText,
+    /**
+     * Walk/create every intermediate object along {@code key} minus the
+     * last, appending each VALIDATED, DECODED segment to
+     * {@code decoded} as it is traversed (§ 5.3.2 / Rust
+     * {@code build/insert.rs insert_dotted}): a blocked prefix reports
+     * KeyPathConflict over the decoded prefix BEFORE the next segment's
+     * escape defect can surface.
+     */
+    private static ObjBuilder walk(ObjBuilder root, Keys.RawPath key,
+            List<String> decoded, int line, String lineText,
             int spanStart, int spanEnd) {
-        if (segments.size() > PureParser.MAX_DEPTH) {
+        if (key.size() > PureParser.MAX_DEPTH) {
             // Depth bound shared with compound nesting (declared limit).
             throw new SourceError(
                     "dotted key path exceeds " + PureParser.MAX_DEPTH
@@ -94,8 +103,9 @@ final class Builders {
                     null, null);
         }
         ObjBuilder cur = root;
-        for (int i = 0; i < segments.size() - 1; i++) {
-            String seg = segments.get(i);
+        for (int i = 0; i < key.size() - 1; i++) {
+            decoded.add(key.decode(i));
+            String seg = decoded.get(i);
             Object existing = cur.map.get(seg);
             if (existing == null) {
                 ObjBuilder created = new ObjBuilder();
@@ -105,10 +115,14 @@ final class Builders {
             } else if (existing instanceof ObjBuilder b) {
                 cur = b; // explicit objects merge too (§ 5.3.2)
             } else {
-                throw conflict(fullPath.subList(0, i + 1), line, lineText,
+                // Envelope path = FULL raw-split with decode/raw
+                // fallback (error/envelope.rs kind_path); the walk
+                // decision above already used the decoded prefix only.
+                throw conflict(key.diagnosticPath(), line, lineText,
                         spanStart, spanEnd);
             }
         }
+        decoded.add(key.decode(key.size() - 1));
         return cur;
     }
 

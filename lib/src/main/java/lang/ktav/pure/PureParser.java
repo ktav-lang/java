@@ -284,7 +284,7 @@ public final class PureParser {
             throw ctx.syntax("EmptyKey", "§6.5",
                     "EmptyKey at line " + ctx.line + ": empty key");
         }
-        List<String> key = Keys.parseKey(b, ts, ci, ctx.line, ctx.lineText,
+        Keys.RawPath key = Keys.splitKey(b, ts, ci, ctx.line, ctx.lineText,
                 ctx.spanStart, ctx.spanEnd);
         if (ci + 1 < te && b[ci + 1] == ':') {
             // Raw marker (§ 5.3): sep-end required, escapes NOT
@@ -309,7 +309,7 @@ public final class PureParser {
     }
 
     /** § 5.2 dispatch for a multi-line pair body at {@code [vs, ve)}. */
-    private void handleBody(List<String> key, int vs, int ve) {
+    private void handleBody(Keys.RawPath key, int vs, int ve) {
         byte[] b = ctx.b;
         if (vs >= ve) {
             // Empty value-part → empty String (§ 5.3).
@@ -352,16 +352,16 @@ public final class PureParser {
         }
     }
 
-    private void attachLeaf(List<String> key, Object value) {
+    private void attachLeaf(Keys.RawPath key, Object value) {
         Builders.ObjBuilder top = stack.peek().obj;
         Builders.Slot slot = Builders.leafSlot(top, key, key.size() == 1,
-                key, ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
+                ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
         slot.set(value);
     }
 
-    private void openCompound(List<String> key, int opener) {
+    private void openCompound(Keys.RawPath key, int opener) {
         Builders.ObjBuilder top = stack.peek().obj;
-        Builders.Slot slot = Builders.compoundSlot(top, key, key,
+        Builders.Slot slot = Builders.compoundSlot(top, key,
                 ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
         if (opener == Scalars.Cls.OPEN_OBJECT) {
             Builders.ObjBuilder child = new Builders.ObjBuilder();
@@ -378,10 +378,10 @@ public final class PureParser {
         }
     }
 
-    private void openMultiline(List<String> key, boolean verbatim) {
+    private void openMultiline(Keys.RawPath key, boolean verbatim) {
         Builders.ObjBuilder top = stack.peek().obj;
         Builders.Slot slot = Builders.leafSlot(top, key, key.size() == 1,
-                key, ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
+                ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
         pushDepth();
         stack.push(new Frame(Frame.ML, false, null, null,
                 new Mline(verbatim, slot), ctx.spanStart, ctx.line));

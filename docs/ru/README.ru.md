@@ -31,9 +31,18 @@ repositories {
 
 dependencies {
     implementation("io.github.ktav-lang:ktav:0.8.1")
-    implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
+
+При обычном использовании объединённый артефакт разрешает нативные зависимости: JNA 5.15.0 (`api`) и jackson-core 2.18.2 (`implementation`).
+
+Для использования только чистого backend в Gradle отключите транзитивные зависимости и вызывайте `PureKtav`:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
+
+Для runtime чистого backend требуется только JDK 17+. Его парсер, writer, formatter и контейнер `ErrorEnvelope` не используют Jackson, JNA, JUnit, native-код, WASM, подпроцессы, сеть или fallback. Для чистого backend в Maven исключите `net.java.dev.jna:jna` и `com.fasterxml.jackson.core:jackson-core`. Инструменты сборки, тестирования и документации отделены от runtime.
 
 ### Парсинг — типизированно вытаскиваем поля
 
@@ -118,13 +127,17 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | Функция | Назначение |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Разобрать Ktav-документ в дерево `Value`. |
+| `Ktav.loads(byte[]) -> Value` | Разобрать исходные UTF-8-байты напрямую; некорректный ввод дает `InvalidUtf8`. |
 | `Ktav.loadsStrict(String) -> Value` | Разобрать документ со строгой проверкой записи чисел. |
+| `Ktav.loadsStrict(byte[]) -> Value` | Строго разобрать исходные UTF-8-байты, сохранив некорректные байты для диагностики `InvalidUtf8`. |
 | `Ktav.dumps(Value) -> String` | Отрендерить `Value` обратно в Ktav-текст. Верхний уровень должен быть `Obj` или `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Отрендерить как `dumps`, но привести каждый leaf-скаляр к String. |
 | `Ktav.emitCanonical(Value) -> String` | Отрендерить `Value` в детерминированной канонической форме. |
 | `Ktav.format(String) -> String` | Нормализовать написание документа, сохраняя комментарии. |
 | `Ktav.canonicalFromSource(String) -> String` | Разобрать и заново вывести как канонический Ktav за один вызов — `emitCanonical(loads(src))` без промежуточного `Value`. Комментарии и пустые строки отбрасывает так же, как `emitCanonical`. |
 | `Ktav.nativeVersion() -> String` | Версия подгруженного `ktav_cabi`. |
+
+Для raw-byte fixtures передавайте исходный `byte[]` в `loads` или `loadsStrict`, чтобы native-парсер сообщил `InvalidUtf8`; предварительное декодирование может завершиться до вызова Ktav. После добавления перегрузки вызовы `Ktav.loads(null)` и `Ktav.loadsStrict(null)` без приведения неоднозначны при компиляции. Приведение к `String` или `byte[]` выбирает перегрузку; обе при null выбрасывают `NullPointerException("src")`.
 
 `toStringForceStrings` расплющивает целые, float, булевы и `null` в их
 текстовую форму через сырой маркер (`::`); объекты и массивы сохраняют
@@ -265,6 +278,18 @@ macOS, `$XDG_CACHE_HOME` или `~/.cache` на Linux.
 | `PureKtav.canonicalFromSource(String)` | Разобрать и заново вывести как канонический Ktav за один вызов. |
 | `PureKtav.format(String)` | Нормализовать написание документа, сохраняя комментарии. Переводы строк в выводе — всегда только LF (на входе принимаются LF, CR и CRLF). |
 | `PureKtav.version()` | Версия чистого бэкенда — реализованная им версия спецификации. |
+
+### Изолированная установка чистого Java-бэкенда
+
+Сборка объединённого артефакта объявляет JNA 5.15.0 как `api` и jackson-core 2.18.2 как `implementation` для нативного ABI и JSON wire. Стандартное разрешение зависимостей Maven/Gradle включает эти зависимости, поэтому обычная установка не является установкой без зависимостей. Это описание объявлений сборки, а не проверенных опубликованных метаданных.
+
+Для использования только чистого бэкенда в Gradle отключите транзитивные зависимости:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
+
+В Maven исключите `net.java.dev.jna:jna` и `com.fasterxml.jackson.core:jackson-core`; альтернативно используйте JAR библиотеки напрямую. Для выполнения только чистого бэкенда нужен JDK 17, сторонние runtime-библиотеки не нужны. Успешные и ошибочные пути чистого бэкенда не используют JNA, Jackson, JUnit, нативный код, WASM, процессы, сеть или fallback. Нативному бэкенду нужны его зависимости; для него сохраняйте обычное разрешение зависимостей.
 
 Фасад повторяет `Ktav` операция в операцию и спроектирован так, чтобы
 давать то же дерево `Value` и те же конверты `KtavException`, поэтому

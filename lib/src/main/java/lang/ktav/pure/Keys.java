@@ -280,39 +280,97 @@ final class Keys {
     }
 
     /**
-     * Decode a full key region into segments; throws EmptyKey /
-     * InvalidKey / BadEscapeSequence. Returns decoded segments
-     * (segment-count ≥ 1).
+     * A key region split into RAW segment ranges, not yet decoded.
+     * Segments are validated and decoded one at a time via
+     * {@link #decode} as path resolution descends (§ 5.3.2; mirrors the
+     * Rust core's {@code build/insert.rs insert_dotted}), so an earlier
+     * structural blocker reports before a later segment's escape
+     * defect. Per-segment defect order is unchanged from
+     * {@code checkAndDecode}: empty → shape-invalid → bad escape.
      */
-    static List<String> parseKey(byte[] b, int from, int end, int line,
-            String lineText, int spanStart, int spanEnd) {
-        List<int[]> raw = splitPath(b, from, end);
-        List<String> decoded = new ArrayList<>(raw.size());
-        List<String> rawSpelling = new ArrayList<>(raw.size());
-        // Per-segment order: the FIRST failing segment decides the
-        // category (empty → EmptyKey, invalid → InvalidKey); a bad
-        // escape already threw inside checkAndDecode.
-        int defect = -1;
-        for (int[] seg : raw) {
+    static final class RawPath {
+        final byte[] b;
+        final List<int[]> ranges;
+        final int line, spanStart, spanEnd;
+        final String lineText;
+
+        RawPath(byte[] b, List<int[]> ranges, int line, String lineText,
+                int spanStart, int spanEnd) {
+            this.b = b;
+            this.ranges = ranges;
+            this.line = line;
+            this.lineText = lineText;
+            this.spanStart = spanStart;
+            this.spanEnd = spanEnd;
+        }
+
+        int size() {
+            return ranges.size();
+        }
+
+        /**
+         * Validate + decode segment {@code i}; throws EmptyKey /
+         * InvalidKey / BadEscapeSequence exactly as parseKey did
+         * (bad escapes throw inside {@code checkAndDecode}).
+         */
+        String decode(int i) {
+            int[] seg = ranges.get(i);
             Segment s = checkAndDecode(b, seg[0], seg[1], line, lineText,
                     spanStart, spanEnd);
-            rawSpelling.add(s.rawPath);
-            decoded.add(s.decoded);
-            if (s.kind != Segment.OK) {
-                defect = s.kind;
-                break;
+            if (s.kind == Segment.EMPTY) {
+                throw SourceError.syntax("EmptyKey", "§6.5", line, lineText,
+                        spanStart, spanEnd,
+                        "EmptyKey at line " + line + ": empty key segment");
             }
+            if (s.kind == Segment.INVALID) {
+                throw SourceError.withPath("InvalidKey", "§6.4", line,
+                        lineText, spanStart, spanEnd, rawSpellings(),
+                        "InvalidKey at line " + line + ": forbidden key byte");
+            }
+            return s.decoded;
         }
-        if (defect == Segment.EMPTY) {
-            throw SourceError.syntax("EmptyKey", "§6.5", line, lineText,
-                    spanStart, spanEnd,
-                    "EmptyKey at line " + line + ": empty key segment");
+
+        /** Raw (post-trim) spelling of every segment, for the
+         *  InvalidKey envelope path (§ 6.4). */
+        List<String> rawSpellings() {
+            List<String> out = new ArrayList<>(ranges.size());
+            for (int[] seg : ranges) {
+                int[] t = Bytes.trim(b, seg[0], seg[1]);
+                out.add(Bytes.text(b, t[0], t[1]));
+            }
+            return out;
         }
-        if (defect == Segment.INVALID) {
-            throw SourceError.withPath("InvalidKey", "§6.4", line, lineText,
-                    spanStart, spanEnd, rawSpelling,
-                    "InvalidKey at line " + line + ": forbidden key byte");
+
+        /**
+         * The FULL raw-split path, decoded where decodable, falling
+         * back to the raw spelling where not (error/envelope.rs
+         * {@code kind_path}) — the KeyPathConflict envelope path. Used
+         * only when CONSTRUCTING the error, after the descent itself
+         * has already decided the outcome segment-by-segment.
+         */
+        List<String> diagnosticPath() {
+            List<String> out = new ArrayList<>(ranges.size());
+            for (int i = 0; i < ranges.size(); i++) {
+                int[] seg = ranges.get(i);
+                try {
+                    out.add(checkAndDecode(b, seg[0], seg[1], line,
+                            lineText, spanStart, spanEnd).decoded);
+                } catch (SourceError e) {
+                    int[] t = Bytes.trim(b, seg[0], seg[1]);
+                    out.add(Bytes.text(b, t[0], t[1]));
+                }
+            }
+            return out;
         }
-        return decoded;
+    }
+
+    /**
+     * Split a key region into raw segment ranges WITHOUT decoding
+     * (segment-count ≥ 1); see {@link RawPath}.
+     */
+    static RawPath splitKey(byte[] b, int from, int end, int line,
+            String lineText, int spanStart, int spanEnd) {
+        return new RawPath(b, splitPath(b, from, end), line, lineText,
+                spanStart, spanEnd);
     }
 }

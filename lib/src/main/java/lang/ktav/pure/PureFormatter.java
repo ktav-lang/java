@@ -59,9 +59,6 @@ import lang.ktav.Value;
  */
 final class PureFormatter {
 
-    private PureFormatter() {
-    }
-
     // ------------------------------------------------------------------
     // Trivia-carrying document model
     // ------------------------------------------------------------------
@@ -456,7 +453,7 @@ final class PureFormatter {
             throw ctx.syntax("EmptyKey", "§6.5",
                     "EmptyKey at line " + ctx.line + ": empty key");
         }
-        List<String> key = Keys.parseKey(b, ts, ci, ctx.line, ctx.lineText,
+        Keys.RawPath key = Keys.splitKey(b, ts, ci, ctx.line, ctx.lineText,
                 ctx.spanStart, ctx.spanEnd);
         if (ci + 1 < te && b[ci + 1] == ':') {
             // Raw marker (§ 5.3): sep-end required, escapes NOT processed.
@@ -480,7 +477,7 @@ final class PureFormatter {
     }
 
     /** § 5.2 dispatch for a multi-line pair body at {@code [vs, ve)}. */
-    private void handleBody(List<String> key, ArrayList<TriviaLine> trivia,
+    private void handleBody(Keys.RawPath key, ArrayList<TriviaLine> trivia,
             int vs, int ve) {
         byte[] b = ctx.b;
         if (vs >= ve) {
@@ -512,7 +509,7 @@ final class PureFormatter {
     }
 
     /** Act on a classify() result in pair position ({@code slotKey} unused). */
-    private void dispatchScalarBody(List<String> key,
+    private void dispatchScalarBody(Keys.RawPath key,
             ArrayList<TriviaLine> trivia, Scalars.Cls cl, Slot arrSlot) {
         switch (cl.opener) {
             case Scalars.Cls.OPEN_OBJECT:
@@ -542,20 +539,21 @@ final class PureFormatter {
     // ------------------------------------------------------------------
 
     /** Resolve a leaf assignment; the slot's value is set immediately. */
-    private void insertLeaf(List<String> segments,
+    private void insertLeaf(Keys.RawPath segments,
             ArrayList<TriviaLine> trivia, Object value) {
         Slot slot = resolveLeaf(segments, trivia);
         slot.value = value instanceof PNode n ? n : PNode.of((Value) value);
     }
 
     /** Resolve (or create) the leaf slot for {@code segments}. */
-    private Slot resolveLeaf(List<String> segments,
+    private Slot resolveLeaf(Keys.RawPath segments,
             ArrayList<TriviaLine> trivia) {
-        PObj parent = walk(segments);
-        String last = segments.get(segments.size() - 1);
+        List<String> decoded = new ArrayList<>(segments.size());
+        PObj parent = walk(segments, decoded);
+        String last = decoded.get(decoded.size() - 1);
         Slot existing = parent.pairs.get(last);
         if (existing != null) {
-            throw occupied(parent, segments, existing);
+            throw occupied(parent, decoded, existing);
         }
         Slot slot = new Slot();
         slot.trivia.addAll(trivia);
@@ -568,13 +566,14 @@ final class PureFormatter {
      * and connected immediately so the closer only appends trailing
      * trivia. Mirrors Builders.compoundSlot's conflict table.
      */
-    private Slot resolveCompound(List<String> segments,
+    private Slot resolveCompound(Keys.RawPath segments,
             ArrayList<TriviaLine> trivia) {
-        PObj parent = walk(segments);
-        String last = segments.get(segments.size() - 1);
+        List<String> decoded = new ArrayList<>(segments.size());
+        PObj parent = walk(segments, decoded);
+        String last = decoded.get(decoded.size() - 1);
         Slot existing = parent.pairs.get(last);
         if (existing != null) {
-            throw occupied(parent, segments, existing);
+            throw occupied(parent, decoded, existing);
         }
         Slot slot = new Slot();
         slot.trivia.addAll(trivia);
@@ -585,9 +584,13 @@ final class PureFormatter {
     /**
      * Walk/create every intermediate object along {@code segments} minus
      * the last (reopen-merge of synthetic and explicit objects,
-     * KeyPathConflict on a non-object intermediate).
+     * KeyPathConflict on a non-object intermediate), appending each
+     * VALIDATED, DECODED segment to {@code decoded} as it is traversed
+     * (§ 5.3.2 / Rust {@code build/insert.rs insert_dotted}): a blocked
+     * prefix reports over the decoded prefix BEFORE the next segment's
+     * escape defect can surface.
      */
-    private PObj walk(List<String> segments) {
+    private PObj walk(Keys.RawPath segments, List<String> decoded) {
         if (segments.size() > PureParser.MAX_DEPTH) {
             throw new SourceError(
                     "dotted key path exceeds " + PureParser.MAX_DEPTH
@@ -598,7 +601,8 @@ final class PureFormatter {
         Frame top = stack.peek();
         PObj cur = top.obj;
         for (int i = 0; i < segments.size() - 1; i++) {
-            String seg = segments.get(i);
+            decoded.add(segments.decode(i));
+            String seg = decoded.get(i);
             Slot existing = cur.pairs.get(seg);
             if (existing == null) {
                 PObj created = new PObj();
@@ -610,12 +614,18 @@ final class PureFormatter {
             } else if (existing.value != null && existing.value.obj != null) {
                 cur = existing.value.obj;
             } else {
-                throw ctx.syntax("KeyPathConflict", "§6.3",
+                // Envelope path = FULL raw-split with decode/raw
+                // fallback (error/envelope.rs kind_path); the walk
+                // decision above already used the decoded prefix only.
+                throw SourceError.withPath("KeyPathConflict", "§6.3",
+                        ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd,
+                        segments.diagnosticPath(),
                         "KeyPathConflict at line " + ctx.line + ": '"
-                                + String.join(".", segments.subList(0, i + 1))
+                                + String.join(".", segments.diagnosticPath())
                                 + "'");
             }
         }
+        decoded.add(segments.decode(segments.size() - 1));
         return cur;
     }
 
@@ -642,7 +652,7 @@ final class PureFormatter {
     // Compound / multi-line openers
     // ------------------------------------------------------------------
 
-    private void openCompound(List<String> key, ArrayList<TriviaLine> trivia,
+    private void openCompound(Keys.RawPath key, ArrayList<TriviaLine> trivia,
             int opener) {
         Slot slot = resolveCompound(key, trivia);
         pushDepth();
@@ -680,7 +690,7 @@ final class PureFormatter {
      * Open a multi-line string under a pair key or as an array item;
      * exactly one of {@code key} / {@code arrSlot} is used.
      */
-    private void openMultiline(List<String> key, Slot arrSlot,
+    private void openMultiline(Keys.RawPath key, Slot arrSlot,
             ArrayList<TriviaLine> trivia, boolean verbatim) {
         Holder holder = new Holder();
         if (arrSlot != null) {

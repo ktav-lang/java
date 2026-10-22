@@ -39,8 +39,15 @@ public final class Ktav {
         if (src == null) {
             throw new NullPointerException("src");
         }
-        byte[] input = src.getBytes(StandardCharsets.UTF_8);
-        byte[] output = callNative(NativeOp.LOADS, input);
+        return loads(src.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Parse a Ktav document from its original UTF-8 bytes. */
+    public static Value loads(byte[] src) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        byte[] output = callNative(NativeOp.LOADS, src);
         return WireJson.decode(output);
     }
 
@@ -55,8 +62,15 @@ public final class Ktav {
         if (src == null) {
             throw new NullPointerException("src");
         }
-        byte[] input = src.getBytes(StandardCharsets.UTF_8);
-        byte[] output = callNative(NativeOp.LOADS_STRICT, input);
+        return loadsStrict(src.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Parse a Ktav document from UTF-8 bytes with strict numeric spelling checks. */
+    public static Value loadsStrict(byte[] src) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        byte[] output = callNative(NativeOp.LOADS_STRICT, src);
         return WireJson.decode(output);
     }
 
@@ -231,17 +245,19 @@ public final class Ktav {
     private static byte[] callNative(NativeOp op, byte[] input) {
         NativeLib lib = NativeLib.get();
 
+        // Invariant: the C ABI dereferences src as a slice header; Rust
+        // requires a non-null aligned pointer even for len 0, so an empty
+        // source keeps a live 1-byte buffer while the logical length stays
+        // 0 (never a NUL byte at length 1).
+        //
         // try-with-resources releases the native buffer even if the JNA
         // call throws — otherwise the Memory leaks until the next GC
         // finalizer pass.
-        try (Memory srcMem = input.length == 0 ? null : new Memory(input.length)) {
-            Pointer srcPtr;
-            if (srcMem == null) {
-                srcPtr = Pointer.NULL;
-            } else {
+        try (Memory srcMem = new Memory(Math.max(1, input.length))) {
+            if (input.length > 0) {
                 srcMem.write(0, input, 0, input.length);
-                srcPtr = srcMem;
             }
+            Pointer srcPtr = srcMem;
 
             PointerByReference outBuf = new PointerByReference();
             LongByReference outLen = new LongByReference();

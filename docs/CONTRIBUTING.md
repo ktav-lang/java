@@ -137,9 +137,19 @@ CI runs the same commands; run them locally before pushing.
 - **Pure backend.** Since 0.8.1, `lang.ktav.pure` (facade `PureKtav`)
   mirrors the native backend in plain Java — same `Value` tree, same
   `KtavException` envelopes, same operation set — and never loads or
-  downloads the native library. Dual-backend tests run the conformance
-  corpus through both; `CrossBackendTest` checks roundtrips between
-  them; the `test-pure` CI job runs the pure suite with no cargo step.
+  downloads the native library. Its parser, writer, formatter, and shared
+  `ErrorEnvelope` holder (`of` / getters) are JDK-only; `ErrorEnvelope.parse`
+  delegates to the separate native Jackson error codec. Other native JSON
+  wire operations also use Jackson. The combined artifact declares JNA
+  5.15.0 as `api` for native FFI and jackson-core 2.18.2 as
+  `implementation` for native JSON codecs. Normal dependency resolution
+  includes these dependencies; pure-only consumers can avoid both with
+  Gradle `isTransitive = false` or Maven exclusions. JDK 17+ suffices to
+  run the pure backend with the artifact JAR available. Build, test, and
+  documentation tooling is separate from runtime dependencies. Dual-backend
+  tests run the conformance corpus through both; `CrossBackendTest` checks
+  roundtrips between them; the `test-pure` CI job runs the pure suite with
+  no cargo step.
 
 ## Release flow
 

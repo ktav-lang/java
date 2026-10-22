@@ -8,13 +8,11 @@ import lang.ktav.pure.PureKtav;
 
 /**
  * JUnit-free smoke check over the PURE backend, run by the Gradle
- * {@code pureJarTest} task on the PACKAGED jar with ONLY jackson-core
- * on the classpath (no JNA, no JUnit, no test framework). Its whole
+ * {@code pureJarTest} task on the packaged JAR plus checker JAR only.
  * point is classpath sufficiency: touching only
  * {@link PureKtav} / {@link Value} / {@link KtavException} — and
  * {@code internal.ErrorEnvelope} via its plain {@code of(...)} factory
- * (whose class-initialiser needs jackson-core only) — proves no native
- * resolution path is reachable: {@code internal.NativeLib} /
+ * — proves no native resolution path is reachable: {@code internal.NativeLib} /
  * {@code internal.NativeLoader} are never referenced, and the bogus
  * {@code KTAV_LIB_PATH} the task plants in the environment would make
  * any accidental native attempt fail loudly.
@@ -29,22 +27,20 @@ public final class PureSmokeMain {
 
     public static void main(String[] args) {
         int failures = 0;
-        failures += check("bogus KTAV_LIB_PATH override is visible",
-                PureSmokeMain::checkEnvGuard);
+        failures += check("bogus KTAV_LIB_PATH override is visible", PureSmokeMain::checkEnvGuard);
+        failures += check("external libraries are absent", PureSmokeMain::checkNoExternalClasses);
         failures += check("loads parses a.b to a nested Obj", PureSmokeMain::checkLoadsObj);
         failures += check("loadsStrict accepts canonical and rejects LossyScalar",
                 PureSmokeMain::checkStrict);
         failures += check("dumps → loads round trip", PureSmokeMain::checkRoundTrip);
-        failures += check("emitCanonical exact §5.9.8 string",
-                PureSmokeMain::checkCanonical);
-        failures += check("toStringForceStrings emits ::",
-                PureSmokeMain::checkForceStrings);
+        failures += check("dumps rejects unrepresentable values", PureSmokeMain::checkWriterErrors);
+        failures += check("emitCanonical exact §5.9.8 string", PureSmokeMain::checkCanonical);
         failures += check("format preserves comments", PureSmokeMain::checkFormat);
-        failures += check("runs against the packaged jar, not loose classes",
-                PureSmokeMain::checkJarSource);
+        failures += check("toStringForceStrings emits ::", PureSmokeMain::checkForceStrings);
+        failures += check("loads(byte[]) rejects invalid UTF-8", PureSmokeMain::checkInvalidUtf8);
+        failures += check("grammar error reports exact UTF-8 byte span", PureSmokeMain::checkGrammarSpan);
+        failures += check("runs against the packaged jar, not loose classes", PureSmokeMain::checkJarSource);
         failures += check("version is 0.8.1", PureSmokeMain::checkVersion);
-        failures += check("loads(byte[]) rejects InvalidUtf8", PureSmokeMain::checkInvalidUtf8);
-
         if (failures > 0) {
             System.out.println("FAIL pure smoke: " + failures + " check(s) failed");
             System.exit(1);
@@ -61,6 +57,16 @@ public final class PureSmokeMain {
             throw new AssertionError(
                     "KTAV_LIB_PATH is not set — the packaged-pure job's"
                             + " nonexistent-path guard is not active");
+        }
+    }
+
+    private static void checkNoExternalClasses() throws Exception {
+        ClassLoader loader = PureSmokeMain.class.getClassLoader();
+        for (String name : new String[]{"com.fasterxml.jackson.core.JsonFactory",
+                "com.sun.jna.Native", "org.junit.jupiter.api.Test"}) {
+            try { Class.forName(name, false, loader); }
+            catch (ClassNotFoundException expected) { continue; }
+            throw new AssertionError("external class unexpectedly available: " + name);
         }
     }
 
@@ -98,11 +104,12 @@ public final class PureSmokeMain {
     }
 
     private static void checkStrict() {
-        Value ok = PureKtav.loadsStrict("a: 1\n");
-        if (!(ok instanceof Value.Obj o && o.entries().get("a") instanceof Value.Int i
-                && i.text().equals("1"))) {
-            throw new AssertionError("loadsStrict must accept canonical input, got: " + ok);
-        }
+        // Loading and each operation are separate witnesses of the packaged API.
+        byte[] source = "a: 1\n".getBytes(StandardCharsets.UTF_8);
+        assertPair("loads(byte[])", PureKtav.loads(source));
+        assertPair("loads(String)", PureKtav.loads("a: 1\n"));
+        assertPair("loadsStrict(byte[])", PureKtav.loadsStrict(source));
+        assertPair("loadsStrict(String)", PureKtav.loadsStrict("a: 1\n"));
         Value padded = PureKtav.loadsStrict("a: 01\n");
         // §5.2: redundant leading zeros are Strings in BOTH modes — never lossy.
         if (!(padded instanceof Value.Obj p
@@ -126,6 +133,13 @@ public final class PureSmokeMain {
         }
     }
 
+    private static void assertPair(String operation, Value value) {
+        if (!(value instanceof Value.Obj o && o.entries().get("a") instanceof Value.Int i
+                && i.text().equals("1"))) {
+            throw new AssertionError(operation + " expected {a: Int(1)}, got: " + value);
+        }
+    }
+
     private static void checkRoundTrip() {
         LinkedHashMap<String, Value> entries = new LinkedHashMap<>();
         entries.put("name", new Value.Str("ktav"));
@@ -141,12 +155,11 @@ public final class PureSmokeMain {
     }
 
     private static void checkCanonical() {
-        String got = PureKtav.canonicalFromSource("a: 1.50\n");
-        // Spec § 5.9.8: shortest round-trip decimal — 1.50 → 1.5
-        if (!"a: 1.5\n".equals(got)) {
-            throw new AssertionError("canonical of 1.50 must be \"a: 1.5\\n\", got: \""
-                    + got + "\"");
-        }
+        Value floatDoc = new Value.Obj(Map.of("a", new Value.Flt("1.50")));
+        String emitted = PureKtav.emitCanonical(floatDoc);
+        if (!"a: 1.5\n".equals(emitted)) throw new AssertionError("emitCanonical: " + emitted);
+        if (!"a: 1.5\n".equals(PureKtav.canonicalFromSource("a: 1.50\n")))
+            throw new AssertionError("canonicalFromSource mismatch");
         String sci = PureKtav.canonicalFromSource("a: 5e3\n");
         if (!"a: 5000.0\n".equals(sci)) {
             throw new AssertionError("canonical of 5e3 must be \"a: 5000.0\\n\", got: \""
@@ -155,10 +168,10 @@ public final class PureSmokeMain {
     }
 
     private static void checkForceStrings() {
-        String got = PureKtav.toStringForceStrings(
+        String forced = PureKtav.toStringForceStrings(
                 new Value.Obj(new LinkedHashMap<>(Map.of("n", new Value.Int("7")))));
-        if (!got.contains("::")) {
-            throw new AssertionError("force-strings output must contain '::': \"" + got + "\"");
+        if (!forced.contains("::")) {
+            throw new AssertionError("force-strings output must contain '::': \"" + forced + "\"");
         }
     }
 
@@ -167,6 +180,21 @@ public final class PureSmokeMain {
         String got = PureKtav.format("## header comment\na: 1\n");
         if (!got.contains("## header comment")) {
             throw new AssertionError("format must preserve comments, got: \"" + got + "\"");
+        }
+        String duplicate = "é: 1\né: 2\n";
+        try {
+            PureKtav.format(duplicate);
+            throw new AssertionError("expected DuplicateKey from format");
+        } catch (KtavException e) {
+            if (!"DuplicateKey".equals(e.getError())
+                    || e.getSpanStart() == null || e.getSpanStart() != 6
+                    || e.getSpanEnd() == null || e.getSpanEnd() != 11
+                    || e.getLine() == null || e.getLine() != 2
+                    || !"é: 2".equals(e.getLineText())) {
+                throw new AssertionError("unexpected formatter error diagnostics: "
+                        + e.getError() + " span " + e.getSpanStart() + ".." + e.getSpanEnd()
+                        + " line " + e.getLine() + " text " + e.getLineText());
+            }
         }
         // § 3.4: a single '#' is NOT a comment — '# hash' after ': ' is
         // an ordinary scalar, so the pair value is the String "# hash".
@@ -205,10 +233,7 @@ public final class PureSmokeMain {
     }
 
     private static void checkInvalidUtf8() {
-        byte[] bad = "a: 1\n".getBytes(StandardCharsets.UTF_8);
-        byte[] raw = new byte[bad.length + 1];
-        System.arraycopy(bad, 0, raw, 0, bad.length);
-        raw[bad.length] = (byte) 0xFF;
+        byte[] raw = new byte[]{'a', ':', ' ', (byte) 0xFF};
         try {
             PureKtav.loads(raw);
             throw new AssertionError("loads(byte[]) must reject invalid UTF-8");
@@ -218,8 +243,51 @@ public final class PureSmokeMain {
                         "expected InvalidUtf8, got: " + e.getError());
             }
             if (e.getSpanStart() == null || e.getSpanEnd() == null
-                    || e.getSpanEnd() <= e.getSpanStart()) {
-                throw new AssertionError("InvalidUtf8 span must be non-empty");
+                    || e.getSpanStart() != 3 || e.getSpanEnd() != 4
+                    || e.getLine() == null || e.getLine() != 1) {
+                throw new AssertionError("InvalidUtf8 expected span 3..4 line 1, got "
+                        + e.getSpanStart() + ".." + e.getSpanEnd() + " line " + e.getLine());
+            }
+        }
+    }
+
+    private static void checkGrammarSpan() {
+        try {
+            PureKtav.loads("é: 1\né: 2\n");
+            throw new AssertionError("expected DuplicateKey");
+        } catch (KtavException e) {
+            if (!"DuplicateKey".equals(e.getError())
+                    || e.getSpanStart() == null || e.getSpanStart() != 6
+                    || e.getSpanEnd() == null || e.getSpanEnd() != 11
+                    || e.getLine() == null || e.getLine() != 2 || !"é: 2".equals(e.getLineText())
+                    || e.getPath() == null || !e.getPath().equals(java.util.List.of("é"))) {
+                throw new AssertionError("expected DuplicateKey span 6..11 line 2 text 'é: 2' path [é], got "
+                        + e.getError() + " span " + e.getSpanStart() + ".." + e.getSpanEnd()
+                        + " line " + e.getLine() + " text " + e.getLineText() + " path " + e.getPath());
+            }
+        }
+    }
+
+    private static void checkWriterErrors() {
+        try {
+            PureKtav.dumps(new Value.Int("1"));
+            throw new AssertionError("expected ScalarRoot");
+        } catch (KtavException e) {
+            if (!"UnrepresentableAt".equals(e.getError())
+                    || !"ScalarRoot".equals(e.getReason()) || e.getPath() == null
+                    || !e.getPath().isEmpty()) {
+                throw new AssertionError("unexpected ScalarRoot envelope: "
+                        + e.getError() + " " + e.getReason() + " " + e.getPath());
+            }
+        }
+        try {
+            PureKtav.dumps(new Value.Obj(Map.of("outer",
+                    new Value.Obj(Map.of("x", new Value.Flt("NaN"))))));
+            throw new AssertionError("expected NonFiniteFloat");
+        } catch (KtavException e) {
+            if (!"NonFiniteFloat".equals(e.getReason()) || e.getPath() == null
+                    || !e.getPath().equals(java.util.List.of("outer", "x"))) {
+                throw new AssertionError("unexpected writer error: " + e.getReason() + " " + e.getPath());
             }
         }
     }

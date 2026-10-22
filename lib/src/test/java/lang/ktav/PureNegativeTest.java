@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -70,6 +71,109 @@ final class PureNegativeTest {
         assertEquals("§6.16", e.getSpecSection());
     }
 
+    /**
+     * § 5.3.2 / Rust {@code build/insert.rs insert_dotted} ordering: the
+     * blocked scalar prefix `a` is a KeyPathConflict over the decoded
+     * prefix BEFORE the later quoted segment's malformed `\q` escape can
+     * surface as BadEscapeSequence. Path carries the raw quoted spelling
+     * (envelope raw fallback, error/envelope.rs kind_path).
+     */
+    @Test
+    void conflictOverBlockedPrefixPrecedesLaterBadEscape() {
+        KtavException e = err("a: 1\na.\"\\q\": 2\n");
+        assertEquals("KeyPathConflict", e.getError());
+        assertEquals(List.of("a", "\"\\q\""), e.getPath());
+    }
+
+    /** Control: no blocker on the path — the escape defect still wins. */
+    @Test
+    void badEscapeStillReportedWithoutBlockedPrefix() {
+        KtavException e = err("a: {}\na.\"\\q\": 2\n");
+        assertEquals("BadEscapeSequence", e.getError());
+    }
+
+    /** Control: a VALID `\\q` (escaped backslash + q) parses on all four operations. */
+    @Test
+    void validEscapedBackslashKeyParsesAllOperations() {
+        String src = "a: {}\na.\"\\\\q\": 2\n";
+        // loads / loadsStrict: outer 'a' is an Obj whose single key is
+        // the DECODED segment (one backslash + 'q'), not the raw quoted
+        // spelling, and the value is Int 2.
+        for (Value.Obj top : List.of(
+                assertInstanceOf(Value.Obj.class,
+                        lang.ktav.pure.PureKtav.loads(src)),
+                assertInstanceOf(Value.Obj.class,
+                        lang.ktav.pure.PureKtav.loadsStrict(src)))) {
+            Value inner = top.entries().get("a");
+            Value.Obj obj = assertInstanceOf(Value.Obj.class, inner);
+            assertTrue(obj.entries().containsKey("\\q"),
+                    "decoded segment must be one backslash + q, got: "
+                            + obj.entries().keySet());
+            assertFalse(obj.entries().containsKey("\"\\q\""),
+                    "raw quoted spelling must not survive decoding");
+            assertEquals("2",
+                    assertInstanceOf(Value.Int.class,
+                            obj.entries().get("\\q")).text());
+        }
+        Value expected = new Value.Obj(java.util.Map.of(
+                "a", new Value.Obj(java.util.Map.of("\\q", new Value.Int("2")))));
+        assertEquals(expected, lang.ktav.pure.PureKtav.loadsStrict(
+                lang.ktav.pure.PureKtav.format(src)));
+        assertEquals(expected, lang.ktav.pure.PureKtav.loadsStrict(
+                lang.ktav.pure.PureKtav.canonicalFromSource(src)));
+    }
+
+    // ── § 5.3.2 path priority, all four operations, PURE backend ────────
+
+    /** The four pure operations, each throwing exactly once on {@code src}. */
+    private static KtavException pureErr(String src, int op) {
+        try {
+            switch (op) {
+                case 0 -> lang.ktav.pure.PureKtav.loads(src);
+                case 1 -> lang.ktav.pure.PureKtav.loadsStrict(src);
+                case 2 -> lang.ktav.pure.PureKtav.format(src);
+                default -> lang.ktav.pure.PureKtav.canonicalFromSource(src);
+            }
+        } catch (KtavException e) {
+            return e;
+        }
+        throw new AssertionError("expected KtavException (op " + op + "): "
+                + src);
+    }
+
+    private static final List<String> OP_NAMES =
+            List.of("loads", "loadsStrict", "format", "canonicalFromSource");
+
+    /**
+     * Conflict vector: the blocked scalar prefix wins over the later
+     * bad escape on ALL four operations, and the formatter (not just
+     * the parser/Builders) carries the FULL raw-split path.
+     */
+    @Test
+    void conflictVectorKeyPathConflictWithPathOnAllFourPureOperations() {
+        String src = "a: 1\na.\"\\q\": 2\n";
+        for (int op = 0; op < 4; op++) {
+            KtavException e = pureErr(src, op);
+            assertEquals("KeyPathConflict", e.getError(),
+                    OP_NAMES.get(op));
+            assertEquals("§6.3", e.getSpecSection(), OP_NAMES.get(op));
+            assertEquals(List.of("a", "\"\\q\""), e.getPath(),
+                    OP_NAMES.get(op));
+        }
+    }
+
+    /** Control: no blocker — BadEscapeSequence (§ 6.13) on all four. */
+    @Test
+    void controlVectorBadEscapeSequenceOnAllFourPureOperations() {
+        String src = "a: {}\na.\"\\q\": 2\n";
+        for (int op = 0; op < 4; op++) {
+            KtavException e = pureErr(src, op);
+            assertEquals("BadEscapeSequence", e.getError(),
+                    OP_NAMES.get(op));
+            assertEquals("§6.13", e.getSpecSection(), OP_NAMES.get(op));
+        }
+    }
+
     // ── Keys ────────────────────────────────────────────────────────────
 
     @Test
@@ -95,7 +199,9 @@ final class PureNegativeTest {
         KtavException e = err("a: 1\na.b: 2\n");
         assertEquals("KeyPathConflict", e.getError());
         assertEquals("§6.3", e.getSpecSection());
-        assertEquals(List.of("a"), e.getPath());
+        // FULL raw-split path (error/envelope.rs kind_path), not the
+        // blocked prefix: both segments decode, so both appear.
+        assertEquals(List.of("a", "b"), e.getPath());
     }
 
     @Test
@@ -258,7 +364,8 @@ final class PureNegativeTest {
     void stringEntryCanNeverThrowInvalidUtf8() {
         // A Java String is always valid Unicode, so encoding to UTF-8
         // first makes InvalidUtf8 unreachable from the String entry —
-        // same as the native &str path.
+        // the byte[] entry (Ktav.loads(byte[])) is where the native
+        // backend performs that same UTF-8 validation.
         assertNotNull(lang.ktav.pure.PureKtav.loads("\uD83D\uDE00: é\n"));
     }
 

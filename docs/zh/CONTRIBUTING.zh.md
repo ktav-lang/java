@@ -124,10 +124,16 @@ CI 运行相同的命令；推送前请先在本地运行。
   `NativeLoader.resolve()` 决定 —— env / 缓存 / 下载。
 - **纯后端。** 从 0.8.1 起，`lang.ktav.pure`（门面 `PureKtav`）用纯
   Java 镜像原生后端 —— 相同的 `Value` 树、相同的 `KtavException`
-  信封、相同的操作集合 —— 且从不加载或下载原生库。双后端测试把
-  conformance 语料跑过两者；`CrossBackendTest` 检查它们之间的
-  roundtrip；CI 的 `test-pure` 作业在不进行 cargo 构建的情况下运行
-  纯后端套件。
+  信封、相同的操作集合 —— 且从不加载或下载原生库。其解析器、写入器、
+  格式化器和共享 `ErrorEnvelope` 持有对象（`of` / getters）仅依赖 JDK；
+  `ErrorEnvelope.parse` 委托给独立的原生 Jackson 错误 codec。其他原生
+  JSON wire 操作也使用 Jackson。合并制品将 JNA 5.15.0 声明为原生 FFI
+  的 `api`，将 jackson-core 2.18.2 声明为原生 JSON codec 的
+  `implementation`。常规依赖解析会包含这些依赖；纯后端用户可通过
+  Gradle `isTransitive = false` 或 Maven exclusions 排除两者。使用制品
+  JAR 运行纯后端只需 JDK 17+。构建、测试和文档工具与运行时依赖相互
+  独立。双后端测试会对两者运行一致性语料；`CrossBackendTest` 检查
+  两者间的往返；CI 的 `test-pure` 作业不执行 cargo 步骤而运行纯后端套件。
 
 ## 发布流程
 

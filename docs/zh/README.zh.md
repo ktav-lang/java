@@ -20,7 +20,7 @@
 
 ## 快速开始
 
-`build.gradle.kts`:
+`build.gradle.kts`：
 
 ```kotlin
 repositories {
@@ -29,9 +29,18 @@ repositories {
 
 dependencies {
     implementation("io.github.ktav-lang:ktav:0.8.1")
-    implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
+
+常规使用时，合并制品会解析其原生依赖：JNA 5.15.0（`api`）和 jackson-core 2.18.2（`implementation`）。
+
+若在 Gradle 中仅使用纯后端，请禁用传递依赖并调用 `PureKtav`：
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
+
+纯后端运行时仅需 JDK 17+。其解析器、写入器、格式化器和 `ErrorEnvelope` 持有对象不使用 Jackson、JNA、JUnit、原生代码、WASM、子进程、网络或回退机制。Maven 纯后端用户需排除 `net.java.dev.jna:jna` 和 `com.fasterxml.jackson.core:jackson-core`。构建、测试和文档工具与运行时相互独立。
 
 ### 解析 —— 按类型读取字段
 
@@ -116,13 +125,17 @@ String text = Ktav.dumps(new Value.Obj(doc));
 | 函数 | 作用 |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | 将 Ktav 文档解析为 `Value` 树。 |
+| `Ktav.loads(byte[]) -> Value` | 直接解析原始 UTF-8 字节；无效输入报告为 `InvalidUtf8`。 |
 | `Ktav.loadsStrict(String) -> Value` | 使用严格数字词法检查解析文档。 |
+| `Ktav.loadsStrict(byte[]) -> Value` | 严格解析原始 UTF-8 字节，并保留无效字节以报告 `InvalidUtf8`。 |
 | `Ktav.dumps(Value) -> String` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj` 或 `Arr`。 |
 | `Ktav.toStringForceStrings(Value) -> String` | 输出与 `dumps` 相同，但把每个叶子标量强制为 String。 |
 | `Ktav.emitCanonical(Value) -> String` | 将 `Value` 渲染为确定性的规范形式。 |
 | `Ktav.format(String) -> String` | 规范化文档的写法，同时保留注释。 |
 | `Ktav.canonicalFromSource(String) -> String` | 一次调用完成解析并重新输出为规范 Ktav —— 相当于 `emitCanonical(loads(src))`,但中间没有 `Value`。像 `emitCanonical` 一样丢弃注释与空行。 |
 | `Ktav.nativeVersion() -> String` | 已加载的 `ktav_cabi` 的版本字符串。 |
+
+对于 raw-byte 一致性测试，请将原始 `byte[]` 传给 `loads` 或 `loadsStrict`，让 native 解析器报告 `InvalidUtf8`；预先解码可能在 Ktav 收到数据前失败。添加 `byte[]` 重载后，未显式转换的 `Ktav.loads(null)` 和 `Ktav.loadsStrict(null)` 在编译时会有歧义。转换为 `String` 或 `byte[]` 可选择重载；两种类型的 null 都会抛出 `NullPointerException("src")`。
 
 `toStringForceStrings` 把整数、float、布尔与 `null` 用原始标记(`::`)
 压平为它们的文本形式；对象与数组保持自身结构，因为只有叶子会被强制。
@@ -252,6 +265,17 @@ writer 的两种拒绝被分开命名 —— 当 writer 能指出是哪个节点
 | `PureKtav.format(String)` | 规范化文档写法，保留注释。输出的换行符始终只有 LF（输入接受 LF、CR 和 CRLF）。 |
 | `PureKtav.version()` | 纯后端版本 —— 其实现的规范版本。 |
 
+### 纯 Java 后端的独立安装
+
+合并制品的构建将 JNA 5.15.0 声明为 `api`，将 jackson-core 2.18.2 声明为 `implementation`，用于原生 ABI 和 JSON wire。标准 Maven/Gradle 依赖解析会包含这些依赖，因此常规安装并非零依赖安装。这里描述的是构建声明，并非已核实的发布元数据。
+
+Gradle 纯后端用法可关闭传递依赖：
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
+
+Maven 请同时排除 `net.java.dev.jna:jna` 和 `com.fasterxml.jackson.core:jackson-core`；也可直接使用本库 JAR。纯后端运行需要 JDK 17，不需要第三方运行时库。纯后端的成功和错误路径均不使用 JNA、Jackson、JUnit、原生代码、WASM、子进程、网络或回退。原生后端用法需要其依赖；请为其保留常规依赖解析。
 该门面逐操作镜像 `Ktav`，其设计目标是产出相同的 `Value` 树和相同的
 `KtavException` 信封，因此针对一个后端编写的代码，换到另一个后端
 无需改动。没有全局后端开关：后端通过显式调用选择 —— `Ktav`

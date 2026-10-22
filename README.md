@@ -30,9 +30,18 @@ repositories {
 
 dependencies {
     implementation("io.github.ktav-lang:ktav:0.8.1")
-    implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
+
+For normal use, the combined artifact resolves its native dependencies: JNA 5.15.0 (`api`) and jackson-core 2.18.2 (`implementation`).
+
+For pure-only Gradle use, disable transitive dependencies and call `PureKtav`:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
+
+Pure runtime requires only JDK 17+. Its parser, writer, formatter, and `ErrorEnvelope` holder use no Jackson, JNA, JUnit, native code, WASM, subprocess, network, or fallback. Maven pure-only consumers must exclude both `net.java.dev.jna:jna` and `com.fasterxml.jackson.core:jackson-core`. Build, test, and documentation tooling is separate from runtime.
 
 ### Parse — pull typed fields out of a document
 
@@ -117,13 +126,17 @@ A complete runnable version lives in [`examples/basic`](examples/basic/src/main/
 | Function | Purpose |
 | --- | --- |
 | `Ktav.loads(String) -> Value` | Parse a Ktav document into the `Value` tree. |
+| `Ktav.loads(byte[]) -> Value` | Parse original UTF-8 bytes directly; invalid input is reported as `InvalidUtf8`. |
 | `Ktav.loadsStrict(String) -> Value` | Parse with strict numeric spelling checks. |
+| `Ktav.loadsStrict(byte[]) -> Value` | Strictly parse original UTF-8 bytes, preserving invalid bytes for `InvalidUtf8` diagnostics. |
 | `Ktav.dumps(Value) -> String` | Render a `Value` back as Ktav text. Top-level must be an `Obj` or `Arr`. |
 | `Ktav.toStringForceStrings(Value) -> String` | Render like `dumps`, but coerce every leaf scalar to a String. |
 | `Ktav.emitCanonical(Value) -> String` | Render a `Value` as deterministic canonical form. |
 | `Ktav.format(String) -> String` | Normalise a document's spelling, keeping comments. |
 | `Ktav.canonicalFromSource(String) -> String` | Parse and re-emit as canonical Ktav in one call — `emitCanonical(loads(src))` with no intermediate `Value`. Drops comments and blank lines like `emitCanonical` does. |
 | `Ktav.nativeVersion() -> String` | Version string reported by the loaded `ktav_cabi`. |
+
+For raw-byte conformance fixtures, pass the original `byte[]` to `loads` or `loadsStrict` so the native parser can report `InvalidUtf8`; decoding a fixture first can reject it before Ktav sees it. Adding the `byte[]` overload means an uncast `Ktav.loads(null)` or `Ktav.loadsStrict(null)` is ambiguous at compile time; cast null to `String` or `byte[]` to select an overload. Either selected overload throws `NullPointerException("src")` for null.
 
 `toStringForceStrings` flattens integers, floats, booleans and `null` to
 their textual form via the raw marker (`::`); objects and arrays keep
@@ -261,6 +274,18 @@ Since 0.8.1 the library ships a second, pure-Java backend in the
 | `PureKtav.canonicalFromSource(String)` | Parse and re-emit as canonical Ktav in one call. |
 | `PureKtav.format(String)` | Normalise a document's spelling, keeping comments. Output line endings are always LF-only (LF, CR, and CRLF inputs are all accepted). |
 | `PureKtav.version()` | Version of the pure backend — the spec version it implements. |
+
+### Isolated pure-Java installation
+
+The combined artifact's build declares JNA 5.15.0 as `api` and jackson-core 2.18.2 as `implementation` for native ABI and JSON-wire support. Standard Maven/Gradle dependency resolution includes those dependencies, so the normal install is not zero-dependency. This describes the build declarations, not verified published metadata.
+
+For pure-only Gradle use, disable transitive dependencies:
+
+```kotlin
+implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
+```
+
+For Maven, exclude both `net.java.dev.jna:jna` and `com.fasterxml.jackson.core:jackson-core`; alternatively, use the library JAR directly. Pure-only runtime use requires JDK 17 and no third-party runtime libraries. Pure success and error paths use no JNA, Jackson, JUnit, native code, WASM, subprocesses, network access, or fallback. Native backend use requires its dependencies; retain normal dependency resolution for it.
 
 The facade mirrors `Ktav` operation-for-operation and is designed to
 produce the same `Value` tree and the same `KtavException` envelopes,

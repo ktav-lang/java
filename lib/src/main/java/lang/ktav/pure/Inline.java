@@ -114,7 +114,7 @@ final class Inline {
                 throw ctx.malformedInline("inline pair has no ':' separator");
             }
             int colon = cr.index;
-            java.util.List<String> key = Keys.parseKey(b, i, colon,
+            Keys.RawPath key = Keys.splitKey(b, i, colon,
                     ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
             Parsed p;
             if (colon + 1 < end && b[colon + 1] == ':') {
@@ -204,9 +204,9 @@ final class Inline {
 
     /** Insert a parsed value under a (possibly dotted) inline-object key. */
     private static void insert(Ctx ctx, Builders.ObjBuilder out,
-            java.util.List<String> key, Object value) {
+            Keys.RawPath key, Object value) {
         Builders.Slot slot = Builders.leafSlot(out, key, key.size() == 1,
-                key, ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
+                ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
         slot.set(value);
     }
 

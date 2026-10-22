@@ -13,11 +13,8 @@ interface Backend {
 
     String name();
 
-    /** Byte-level entry. Only the pure backend has one (UTF-8 before grammar). */
+    /** Byte-level entry, preserving the original source bytes. */
     Value loads(byte[] src);
-
-    /** Whether {@link #loads(byte[])} exists (raw_bytes corpus fixtures). */
-    boolean hasByteEntry();
 
     /** Whether the backend needs the built cabi (guards + CI job split). */
     boolean needsNativeLibrary();
@@ -43,13 +40,7 @@ interface Backend {
             }
 
             @Override public Value loads(byte[] src) {
-                throw new UnsupportedOperationException(
-                        "the native Java API takes a String; the byte -> String"
-                                + " boundary is the InvalidUtf8 rejection point");
-            }
-
-            @Override public boolean hasByteEntry() {
-                return false;
+                return Ktav.loads(src);
             }
 
             @Override public boolean needsNativeLibrary() {
@@ -94,10 +85,6 @@ interface Backend {
 
             @Override public Value loads(byte[] src) {
                 return lang.ktav.pure.PureKtav.loads(src);
-            }
-
-            @Override public boolean hasByteEntry() {
-                return true;
             }
 
             @Override public boolean needsNativeLibrary() {

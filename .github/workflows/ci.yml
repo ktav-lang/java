@@ -155,24 +155,87 @@ jobs:
           path: lib/build/reports/tests/test
           retention-days: 7
 
-  # ------------------------------------------------------------------
-  # Packaged pure backend: run the JUnit-free smoke main against the
-  # PACKAGED jar, twice —
-  #   1. via the :lib:pureJarTest JavaExec (classpath = jar +
-  #      jackson-core ONLY: no JNA, no JUnit — so a green run proves
-  #      lang.ktav.pure never touches the native resolver), and
-  #   2. via a DIRECT java command over build/libs + build/pure-lib,
-  #      proving the same classpath sufficiency OUTSIDE Gradle.
-  # The task plants a nonexistent KTAV_LIB_PATH; any accidental native
-  # resolution would fail loudly against it.
-  # ------------------------------------------------------------------
+  # Packaged pure backend: build the library and checker jars, then run
+  # without Jackson, JNA, JUnit, or loose main-output directories.
   packaged-pure:
-    name: packaged jar pure smoke (no native on classpath)
+    name: packaged jar pure smoke (no native/dependency classpath)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build jars and run packaged pure smoke
+        run: ./gradlew :lib:jar :lib:pureCheckJar :lib:pureJarTest --no-daemon --stacktrace
+      - name: Direct Java run with explicit jars
+        env:
+          KTAV_LIB_PATH: /nonexistent/ktav-native-guard
+        run: java -cp "lib/build/libs/ktav-0.8.1.jar:lib/build/libs/ktav-0.8.1-pure-check.jar" lang.ktav.PureSmokeMain
+
+  # ------------------------------------------------------------------
+  # CI-only verification of the GENERATED POM and Gradle Module
+  # Metadata — no publish, no signing, no secrets. Gradle's own dependency
+  # resolution of build tooling uses the network as normal; the guarantee is
+  # only: no publish, no secrets, zero external pure runtime deps.
+  #
+  # Task-name contract (source-verified at 0.30.0): vanniktech maven-publish
+  # hardcodes the publication name as
+  # `private const val PUBLICATION_NAME = "maven"`
+  # (plugin/src/main/kotlin/com/vanniktech/maven/publish/Platform.kt), so
+  # Gradle's standard maven-publish task names apply:
+  # :lib:generatePomFileForMavenPublication and
+  # :lib:generateMetadataFileForMavenPublication writing to
+  # lib/build/publications/maven/. If a task name ever changes, this job
+  # goes RED; verify with `./gradlew :lib:tasks --all` and adjust the job.
+  # ------------------------------------------------------------------
+  metadata:
+    name: generated POM/module metadata (no publish)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Generate POM + module metadata and build jars
+        run: >
+          ./gradlew :lib:generatePomFileForMavenPublication
+          :lib:generateMetadataFileForMavenPublication
+          :lib:jar :lib:pureJarTest --no-daemon --stacktrace
+      - name: Check generated metadata (no publish)
+        run: |
+          # 1) self-test: negative controls against scripts/metadata-fixtures/
+          python3 scripts/check_publish_metadata.py --self-test
+          # 2) the actual gate on generated artifacts
+          bash scripts/check-publish-metadata.sh
+      - name: Upload generated publication metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-publication-metadata
+          path: lib/build/publications/maven/
+          retention-days: 14
+
+  # ------------------------------------------------------------------
+  # DEBUG-cabi empty-input ABI check. Rust debug builds assert slice
+  # pointer validity, so a Pointer.NULL empty source fails here while
+  # release builds silently hide it. We build WITHOUT --release (that
+  # IS the debug artifact at target/debug/libktav_cabi.so) and pin it
+  # via KTAV_LIB_PATH — no cache/release fallback is possible because
+  # the file did not exist before this build produced it.
+  # ------------------------------------------------------------------
+  native-debug-empty-abi:
+    name: debug cabi / empty-input ABI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
       - uses: actions/setup-java@v4
         with:
@@ -181,17 +244,22 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build jar + run pureJarTest (Gradle, jar + jackson-core only)
-        # pureCheckDeps packages the compiled smoke checker as a jar
-        # (pureCheckJar) and copies it into build/pure-check/ for the
-        # direct java run below. The checker MUST be a jar: a java -cp
-        # wildcard expands jar files only, never a loose .class tree.
-        run: >
-          ./gradlew :lib:jar :lib:pureJarTest :lib:pureDeps :lib:pureCheckJar :lib:pureCheckDeps
-          --no-daemon --stacktrace
+      - name: Build DEBUG native library
+        run: cargo build -p ktav-cabi
 
-      - name: Direct java run (no Gradle, same minimal classpath)
+      - name: Empty-input tests against the real debug artifact
         env:
-          KTAV_LIB_PATH: /nonexistent/ktav-native-guard
-        run: |
-          java -cp "lib/build/libs/*:lib/build/pure-check/*:lib/build/pure-lib/*" lang.ktav.PureSmokeMain
+          KTAV_LIB_PATH: ${{ github.workspace }}/target/debug/libktav_cabi.so
+          KTAV_DEBUG_CABI: debug
+        run: >
+          ./gradlew :lib:test --no-daemon --stacktrace
+          --tests "lang.ktav.NativeEmptyInputTest"
+          --tests "lang.ktav.NativeByteInputTest"
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-native-debug-empty-abi
+          path: lib/build/reports/tests/test
+          retention-days: 7
