@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -114,8 +115,13 @@ final class CrossBackendTest {
                         }));
     }
 
-    private static boolean triviaFree(Path p) throws IOException {
-        byte[] raw = Files.readAllBytes(p);
+    private static boolean triviaFree(Path p) {
+        byte[] raw;
+        try {
+            raw = Files.readAllBytes(p);
+        } catch (IOException error) {
+            throw new UncheckedIOException("Cannot read fixture " + p, error);
+        }
         for (byte b : raw) {
             if (b == '#') return false;
         }
