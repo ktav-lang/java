@@ -112,3 +112,84 @@ jobs:
           path: |
             lib/build/libs/*.jar
           retention-days: 14
+
+  # ------------------------------------------------------------------
+  # Pure-Java backend: full corpus + API/negative/regression tests run
+  # with NO cargo build step at all — proving lang.ktav.pure never
+  # loads or downloads the native library. Gradle fails when a --tests
+  # filter matches nothing, so a missing pure suite is RED here, not
+  # skipped. CrossBackendTest deliberately stays out: it needs the
+  # built cabi and runs in the `test` job.
+  # ------------------------------------------------------------------
+  test-pure:
+    name: pure backend (no native build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Pure-backend tests (no cargo)
+        run: >
+          ./gradlew :lib:test --no-daemon --stacktrace
+          --tests "lang.ktav.PureConformanceTest"
+          --tests "lang.ktav.PureApiTest"
+          --tests "lang.ktav.PureNegativeTest"
+          --tests "lang.ktav.PureRegressionTest"
+          --tests "lang.ktav.PureNoNativeTest"
+          --tests "lang.ktav.CorpusGuardMutationTest"
+          --tests "lang.ktav.PureWhitespaceTest"
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-pure
+          path: lib/build/reports/tests/test
+          retention-days: 7
+
+  # ------------------------------------------------------------------
+  # Packaged pure backend: run the JUnit-free smoke main against the
+  # PACKAGED jar, twice —
+  #   1. via the :lib:pureJarTest JavaExec (classpath = jar +
+  #      jackson-core ONLY: no JNA, no JUnit — so a green run proves
+  #      lang.ktav.pure never touches the native resolver), and
+  #   2. via a DIRECT java command over build/libs + build/pure-lib,
+  #      proving the same classpath sufficiency OUTSIDE Gradle.
+  # The task plants a nonexistent KTAV_LIB_PATH; any accidental native
+  # resolution would fail loudly against it.
+  # ------------------------------------------------------------------
+  packaged-pure:
+    name: packaged jar pure smoke (no native on classpath)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build jar + run pureJarTest (Gradle, jar + jackson-core only)
+        # pureCheckDeps copies the compiled smoke checker into
+        # build/pure-check/ for the direct java run below.
+        run: >
+          ./gradlew :lib:jar :lib:pureJarTest :lib:pureDeps :lib:pureCheckDeps
+          --no-daemon --stacktrace
+
+      - name: Direct java run (no Gradle, same minimal classpath)
+        env:
+          KTAV_LIB_PATH: /nonexistent/ktav-native-guard
+        run: |
+          java -cp "lib/build/libs/*:lib/build/pure-check/*:lib/build/pure-lib/*" lang.ktav.PureSmokeMain

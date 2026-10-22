@@ -29,7 +29,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.8.0")
+    implementation("io.github.ktav-lang:ktav:0.8.1")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -245,6 +245,44 @@ At first call, the Java library resolves `ktav_cabi` in this order:
 
 `<userCache>` is `%LOCALAPPDATA%` on Windows, `~/Library/Caches` on
 macOS, `$XDG_CACHE_HOME` or `~/.cache` on Linux.
+
+## The pure-Java backend
+
+Since 0.8.1 the library ships a second, pure-Java backend in the
+`lang.ktav.pure` package, behind the `PureKtav` facade:
+
+| Function | Purpose |
+| --- | --- |
+| `PureKtav.loads(byte[])` / `PureKtav.loads(String)` | Parse a Ktav document into the `Value` tree. The `byte[]` entries take raw bytes and validate UTF-8 (§ 6.15) before the grammar runs; error spans and line numbers are reported over the ORIGINAL raw bytes (they are not rebased after a leading BOM is skipped). |
+| `PureKtav.loadsStrict(byte[])` / `PureKtav.loadsStrict(String)` | Parse with strict numeric spelling checks. |
+| `PureKtav.dumps(Value)` | Render a `Value` back as Ktav text. Top-level must be an `Obj` or `Arr`. |
+| `PureKtav.toStringForceStrings(Value)` | Render like `dumps`, but coerce every leaf scalar to a String. |
+| `PureKtav.emitCanonical(Value)` | Render a `Value` as deterministic canonical form. Canonical floats follow § 5.9.8: the shortest round-trip decimal, scientific notation iff `abs >= 1e7` or `abs < 1e-2`. |
+| `PureKtav.canonicalFromSource(String)` | Parse and re-emit as canonical Ktav in one call. |
+| `PureKtav.format(String)` | Normalise a document's spelling, keeping comments. Output line endings are always LF-only (LF, CR, and CRLF inputs are all accepted). |
+| `PureKtav.version()` | Version of the pure backend — the spec version it implements. |
+
+The facade mirrors `Ktav` operation-for-operation and produces the same
+`Value` tree and the same `KtavException` envelopes, so code written
+against one backend reads unchanged against the other. There is no
+global backend switch: you choose a backend explicitly by calling
+`Ktav` (native) or `PureKtav` (pure).
+
+Pure mode never loads or downloads a native library — no JNA, no
+`ktav_cabi`, no cache directory, no network. It is the right choice for
+air-gapped environments, platforms without a prebuilt native asset, and
+anywhere a JVM-only dependency matters. The native backend remains the
+reference-tuned path.
+
+Limits of the pure backend: nesting depth (multi-line compound frames,
+inline recursion, dotted-path length) is bounded by 256
+(`PureParser.MAX_DEPTH`), and scalars live in the i64 / binary64
+domains, exactly like the native core. The bound applies to PARSING
+only — the writers are iterative and emit arbitrarily deep trees
+without a depth limit. Canonical output is byte-pinned against the
+native backend by `CrossBackendTest`; the other writers match the
+reference writer's documented layout (4-space indent, insertion order,
+§ 5.9.10 key form selection).
 
 ## Runtime support
 

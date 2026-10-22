@@ -9,7 +9,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.8.0")
+    implementation("io.github.ktav-lang:ktav:0.8.1")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -25,7 +25,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.8.0")
+    implementation("io.github.ktav-lang:ktav:0.8.1")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -41,7 +41,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.8.0")
+    implementation("io.github.ktav-lang:ktav:0.8.1")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```

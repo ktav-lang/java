@@ -11,6 +11,7 @@ export default [
   "type-mapping",
   "key-escaping",
   "native-resolution",
+  "pure-backend",
   "runtime-support",
   "license",
   "implementations"

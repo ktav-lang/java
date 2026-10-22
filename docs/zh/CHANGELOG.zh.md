@@ -12,6 +12,41 @@ MINOR 递增视为破坏性变更。
 
 ## Unreleased
 
+## 0.8.1 — 2026-10-22
+
+### 新增
+
+- **纯 Java 后端。** 新的 `lang.ktav.pure` 包由 `PureKtav` 门面提供，
+  用纯 Java 实现了完整的双向后端：`loads` / `loadsStrict`（支持
+  `byte[]` 或 `String`）、`dumps`、`toStringForceStrings`、
+  `emitCanonical`、`canonicalFromSource` 以及保留注释的 `format`
+  —— 与原生 `Ktav` 相同的操作集合，产出相同的 `Value` 树和相同的
+  `KtavException` 信封。规范输出由 CI 中的 `CrossBackendTest` 钉死
+  —— 该逐字节契约属于参考写入器；其他写入器遵循参考写入器已
+  记录的布局。纯模式从不加载或下载原生库；没有全局后端
+  开关 —— 后端由所调用的类显式选择。限制与核心一致：嵌套深度以 256
+  为界，标量域为 i64 / binary64。规范浮点数遵循 § 5.9.8（最短可回读
+  十进制）；写入器是迭代的（无输出深度限制）；`format` 输出仅 LF。
+
+### 变更
+
+- **Rust 核心升级至 0.8.1。** Rust workspace 改为针对 crates.io 上
+  已发布的 `ktav = "0.8.1"` crate 构建（无 path 覆盖），Java 构件
+  版本同步升至 **0.8.1**。spec 子模块固定版本迁至规范 0.8.1 errata。
+
+### 修复
+
+- **纯后端实现了规范 0.8.1 errata。** 显式打开且从未关闭的根复合
+  结构会诊断为 `UnclosedCompound`；UTF-8 校验（§ 6.15）在语法分析
+  之前运行，并按原始字节报告行号和非空字节区间，因此无效输入不会再
+  被误诊为语法错误；整数字面量的进制前缀仅允许小写（§ 5.2）
+  —— 大写的 `0X`/`0O`/`0B` 写法（如 `0X1A`）是 String，errata
+  确认了这一读法。
+- 测试与 CI：双后端语料 harness 将规范 conformance 语料跑过两个
+  后端；`CrossBackendTest` 断言它们之间的 roundtrip；CI 的
+  `test-pure` 作业在**完全不进行 cargo 构建**的情况下运行完整纯
+  后端套件，证明纯后端从不触碰原生库。
+
 ## 0.8.0 — 2026-09-27
 
 ### 新增

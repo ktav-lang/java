@@ -13,6 +13,49 @@ itself — for the latter see
 
 ## Unreleased
 
+## 0.8.1 — 2026-10-22
+
+### Added
+
+- **Pure-Java backend.** The new package `lang.ktav.pure`, behind the
+  `PureKtav` facade, implements a full bidirectional backend in plain
+  Java: `loads` / `loadsStrict` (over `byte[]` or `String`), `dumps`,
+  `toStringForceStrings`, `emitCanonical`, `canonicalFromSource`, and
+  the comment-preserving `format` — the same operation set as the
+  native `Ktav`, producing the same `Value` tree and the same
+  `KtavException` envelopes. Canonical output is pinned by
+  `CrossBackendTest` in CI — that byte-for-byte contract holds for the
+  reference writer; other writers follow the reference writer's
+  documented layout. Pure mode never loads or downloads a
+  native library; there is no global backend switch — the backend is
+  chosen explicitly by the class you call. Limits mirror the core:
+  nesting depth bounded by 256, i64 / binary64 scalar domains.
+  Canonical floats follow § 5.9.8 (shortest round-trip); the writers
+  are iterative (no emission depth limit) and `format` is LF-only.
+
+### Changed
+
+- **Rust core 0.8.1 upgrade.** The Rust workspace builds against the
+  published `ktav = "0.8.1"` crate from crates.io (no path overrides),
+  and the Java artifact version moves to **0.8.1** in step. The spec
+  submodule pin moves to the spec 0.8.1 errata.
+
+### Fixed
+
+- **Spec 0.8.1 errata implemented in the pure backend.** An explicitly
+  opened root compound that is never closed is diagnosed as
+  `UnclosedCompound`; UTF-8 validation (§ 6.15) runs before the grammar
+  and reports line numbers and a nonempty byte span over the raw
+  bytes, so invalid input is never misdiagnosed as a grammar error;
+  base prefixes on integer literals are lowercase-only (§ 5.2) —
+  uppercase `0X`/`0O`/`0B` spellings such as `0X1A` are Strings, and
+  the errata confirms this reading.
+- Test suite and CI: a dual-backend corpus harness runs the spec
+  conformance corpus through both backends; `CrossBackendTest` asserts
+  roundtrips across them; a `test-pure` CI job runs the full pure
+  suite with **no cargo build step at all**, proving the pure backend
+  never touches the native library.
+
 ## 0.8.0 — 2026-09-27
 
 ### Added

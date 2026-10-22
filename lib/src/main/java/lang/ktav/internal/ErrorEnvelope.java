@@ -141,6 +141,30 @@ public final class ErrorEnvelope {
     }
 
     /**
+     * Build an envelope directly from structured fields. Used by the
+     * pure-Java backend ({@code lang.ktav.pure}) so its errors carry
+     * exactly the same ten-field contract the native side produces.
+     * Field order and semantics mirror {@link #fromError}'s mapping.
+     *
+     * @param message human-readable rendering (never null)
+     */
+    public static ErrorEnvelope of(
+            String error,
+            String reason,
+            Long line,
+            String lineText,
+            Long spanStart,
+            Long spanEnd,
+            List<String> path,
+            String body,
+            String canonical,
+            String specSection,
+            String message) {
+        return new ErrorEnvelope(error, reason, line, lineText, spanStart,
+                spanEnd, path, body, canonical, specSection, message);
+    }
+
+    /**
      * Parse the raw {@code out_err} payload. Never throws — malformed or
      * non-JSON payloads degrade to a fallback envelope with
      * {@code error = "Message"} and the raw text as {@code body}.

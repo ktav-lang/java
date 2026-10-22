@@ -134,6 +134,12 @@ CI runs the same commands; run them locally before pushing.
 - **Loader.** `lang.ktav.internal.NativeLib` dlopens the shared library
   once per process via JNA's `Native.load`. The path is resolved by
   `NativeLoader.resolve()` — env / cache / download.
+- **Pure backend.** Since 0.8.1, `lang.ktav.pure` (facade `PureKtav`)
+  mirrors the native backend in plain Java — same `Value` tree, same
+  `KtavException` envelopes, same operation set — and never loads or
+  downloads the native library. Dual-backend tests run the conformance
+  corpus through both; `CrossBackendTest` checks roundtrips between
+  them; the `test-pure` CI job runs the pure suite with no cargo step.
 
 ## Release flow
 

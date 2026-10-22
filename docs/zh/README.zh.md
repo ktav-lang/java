@@ -28,7 +28,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ktav-lang:ktav:0.8.0")
+    implementation("io.github.ktav-lang:ktav:0.8.1")
     implementation("net.java.dev.jna:jna:5.15.0")
 }
 ```
@@ -235,6 +235,39 @@ writer 的两种拒绝被分开命名 —— 当 writer 能指出是哪个节点
 
 `<userCache>` 在 Windows 上是 `%LOCALAPPDATA%`,macOS 上是
 `~/Library/Caches`,Linux 上是 `$XDG_CACHE_HOME` 或 `~/.cache`。
+
+## 纯 Java 后端
+
+从 0.8.1 起，库在 `lang.ktav.pure` 包中随附第二个纯 Java 后端，
+由 `PureKtav` 门面提供：
+
+| 函数 | 作用 |
+| --- | --- |
+| `PureKtav.loads(byte[])` / `PureKtav.loads(String)` | 将 Ktav 文档解析为 `Value` 树。`byte[]` 入口接受原始字节，并在运行语法之前校验 UTF-8（§ 6.15）；错误区间和行号按原始字节（ORIGINAL raw bytes）报告，跳过前导 BOM 后不会重新偏移。 |
+| `PureKtav.loadsStrict(byte[])` / `PureKtav.loadsStrict(String)` | 使用严格数字词法检查解析文档。 |
+| `PureKtav.dumps(Value)` | 将 `Value` 渲染回 Ktav 文本。顶层必须是 `Obj` 或 `Arr`。 |
+| `PureKtav.toStringForceStrings(Value)` | 输出与 `dumps` 相同，但把每个叶子标量强制为 String。 |
+| `PureKtav.emitCanonical(Value)` | 将 `Value` 渲染为确定性的规范形式。规范浮点数遵循 § 5.9.8：最短可回读十进制表示，仅当 `abs >= 1e7` 或 `abs < 1e-2` 时使用科学计数法。 |
+| `PureKtav.canonicalFromSource(String)` | 一次调用完成解析并重新输出为规范 Ktav。 |
+| `PureKtav.format(String)` | 规范化文档写法，保留注释。输出的换行符始终只有 LF（输入接受 LF、CR 和 CRLF）。 |
+| `PureKtav.version()` | 纯后端版本 —— 其实现的规范版本。 |
+
+该门面逐操作镜像 `Ktav`，产出相同的 `Value` 树和相同的
+`KtavException` 信封，因此针对一个后端编写的代码，换到另一个后端
+无需改动。没有全局后端开关：后端通过显式调用选择 —— `Ktav`
+（原生）或 `PureKtav`（纯）。
+
+纯模式从不加载或下载原生库 —— 没有 JNA、没有 `ktav_cabi`、没有缓存
+目录、没有网络。它适合离线（air-gapped）环境、没有预编译原生资产的
+平台，以及任何在乎纯 JVM 依赖的场景。原生后端仍是按参考实现调优的
+路径。
+
+纯后端的限制：嵌套深度（多行复合框架、inline 递归、dotted 路径
+长度）以 256 为界（`PureParser.MAX_DEPTH`）；标量位于 i64 / binary64
+域，与原生核心完全一致。该限制只作用于解析——写入器是迭代的，
+输出任意深度的树都没有深度限制。规范输出由 `CrossBackendTest` 与
+原生后端逐字节对照；其余写入器遵循参考写入器的文档化布局
+（4 空格缩进、插入顺序、§ 5.9.10 键形式选择）。
 
 ## 运行时支持
 
