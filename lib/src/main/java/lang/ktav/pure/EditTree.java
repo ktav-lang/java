@@ -18,9 +18,6 @@ import java.util.Map;
  */
 final class EditTree {
 
-    private EditTree() {
-    }
-
     // ── Slots ───────────────────────────────────────────────────────────
 
     /** How a value lies in the source; determines the splice bounds. */
