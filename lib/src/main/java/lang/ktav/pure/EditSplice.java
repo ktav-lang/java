@@ -306,17 +306,22 @@ final class EditSplice {
         }
         String head = segments.get(0);
         List<String> rest = segments.subList(1, segments.size());
+        boolean last = rest.isEmpty();
         if (v instanceof Value.Obj o) {
             LinkedHashMap<String, Value> out = new LinkedHashMap<>();
             o.entries().forEach((k, val) -> out.put(k,
-                    k.equals(head) ? nullTargets(val, rest) : val));
+                    k.equals(head)
+                            ? (last ? Value.Null.NULL : nullTargets(val, rest))
+                            : val));
             return new Value.Obj(out);
         }
         if (v instanceof Value.Arr arr) {
             int idx = parseIndexOrNull(head);
             List<Value> out = new ArrayList<>(arr.items().size());
             for (int i = 0; i < arr.items().size(); i++) {
-                out.add(i == idx ? nullTargets(arr.items().get(i), rest)
+                out.add(i == idx
+                        ? (last ? Value.Null.NULL
+                                : nullTargets(arr.items().get(i), rest))
                         : arr.items().get(i));
             }
             return new Value.Arr(out);

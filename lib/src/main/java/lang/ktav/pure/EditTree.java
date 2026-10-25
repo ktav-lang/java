@@ -427,8 +427,11 @@ final class EditTree {
             anchor = top().pendingAnchor;
             top().pendingAnchor = -1;
         }
-        Node node = new Node(frame.node.kind, false,
-                Slot.block(anchor, frame.rangeStart, te));
+        // Attach the POPULATED frame node — a fresh node would drop all
+        // children parsed inside the block.
+        Node node = frame.node;
+        node.inline = false;
+        node.slot = Slot.block(anchor, frame.rangeStart, te);
         Frame parent = top();
         if (parent.isObject) {
             String key = parent.pendingKey;
@@ -652,6 +655,11 @@ final class EditTree {
                 segAt = i;
                 valueStart = true;
                 inKey = isObject;
+                continue;
+            }
+            int w = Bytes.wsAt(b, i, to);
+            if (w > 0) {
+                i += w; // § 3.3 whitespace keeps the value-start armed
                 continue;
             }
             valueStart = false;

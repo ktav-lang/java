@@ -493,6 +493,11 @@ final class Layout {
                 inKey = isObject;
                 continue;
             }
+            int w = Bytes.wsAt(b, i, to);
+            if (w > 0) {
+                i += w; // § 3.3 whitespace keeps the value-start armed
+                continue;
+            }
             valueStart = false;
             i++;
         }

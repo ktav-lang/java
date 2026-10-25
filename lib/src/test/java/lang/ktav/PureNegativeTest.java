@@ -56,24 +56,33 @@ final class PureNegativeTest {
         KtavException lf = err("k: 1\na: [");
         assertEquals(2L, lf.getLine(), "LF: opener on line 2");
         assertEquals("a: [", lf.getLineText());
-        assertEquals(6L, lf.getSpanStart());
+        assertEquals(8L, lf.getSpanStart(), "opener is the '[' byte, not the line start");
 
         KtavException cr = err("k: 1\ra: [");
         assertEquals(2L, cr.getLine(), "lone CR: opener on line 2");
         assertEquals("a: [", cr.getLineText());
-        assertEquals(6L, cr.getSpanStart());
+        assertEquals(8L, cr.getSpanStart());
 
         KtavException crlf = err("k: 1\r\na: [");
         assertEquals(2L, crlf.getLine(), "CRLF is ONE terminator");
         assertEquals("a: [", crlf.getLineText(),
                 "line_text strips exactly one trailing CR");
-        assertEquals(7L, crlf.getSpanStart());
+        assertEquals(9L, crlf.getSpanStart());
 
         KtavException bom = err("\uFEFFk: 1\na: [");
         assertEquals(2L, bom.getLine());
         assertEquals("a: [", bom.getLineText());
-        assertEquals(10L, bom.getSpanStart(),
-                "BOM stays in the raw coordinates (3 + 6 + 1)");
+        assertEquals(11L, bom.getSpanStart(),
+                "BOM stays in the raw coordinates (3 + 8)");
+
+        // Multiline opener: the span starts at the '(' byte itself
+        // (0.9 diagnostics09), not at the opening pair's line start.
+        KtavException ml = err("k: (\nx");
+        assertEquals("UnclosedCompound", ml.getError());
+        assertEquals(1L, ml.getLine());
+        assertEquals("k: (", ml.getLineText());
+        assertEquals(3L, ml.getSpanStart());
+        assertEquals(6L, ml.getSpanEnd());
     }
 
     @Test

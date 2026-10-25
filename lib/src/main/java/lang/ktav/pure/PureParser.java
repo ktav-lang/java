@@ -342,7 +342,7 @@ public final class PureParser {
             case Scalars.Cls.OPEN_ML_STRIPPED:
             case Scalars.Cls.OPEN_ML_VERBATIM:
                 openMultiline(key,
-                        cl.opener == Scalars.Cls.OPEN_ML_VERBATIM);
+                        cl.opener == Scalars.Cls.OPEN_ML_VERBATIM, vs);
                 break;
             default:
                 attachLeaf(key, cl.value);
@@ -375,13 +375,14 @@ public final class PureParser {
         }
     }
 
-    private void openMultiline(Keys.RawPath key, boolean verbatim) {
+    private void openMultiline(Keys.RawPath key, boolean verbatim,
+            int openerOffset) {
         Builders.ObjBuilder top = stack.peek().obj;
         Builders.Slot slot = Builders.leafSlot(top, key, key.size() == 1,
                 ctx.line, ctx.lineText, ctx.spanStart, ctx.spanEnd);
         pushDepth();
         stack.push(new Frame(Frame.ML, false, null, null,
-                new Mline(verbatim, slot), ctx.spanStart, ctx.line));
+                new Mline(verbatim, slot), openerOffset, ctx.line));
     }
 
     // ------------------------------------------------------------------
