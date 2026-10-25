@@ -408,7 +408,7 @@ final class EditValueTest {
     }
 
     @TestFactory
-    Stream<DynamicTest> native() {
+    Stream<DynamicTest> nativeEdits() {
         Backend backend = Backend.nativeBackend();
         CorpusHarness.requireCabiFor(backend);
         return factor(backend);

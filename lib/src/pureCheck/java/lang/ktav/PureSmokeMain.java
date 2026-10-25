@@ -40,7 +40,7 @@ public final class PureSmokeMain {
         failures += check("loads(byte[]) rejects invalid UTF-8", PureSmokeMain::checkInvalidUtf8);
         failures += check("grammar error reports exact UTF-8 byte span", PureSmokeMain::checkGrammarSpan);
         failures += check("runs against the packaged jar, not loose classes", PureSmokeMain::checkJarSource);
-        failures += check("version is 0.8.1", PureSmokeMain::checkVersion);
+        failures += check("version is 0.9.0", PureSmokeMain::checkVersion);
         if (failures > 0) {
             System.out.println("FAIL pure smoke: " + failures + " check(s) failed");
             System.exit(1);
@@ -227,8 +227,8 @@ public final class PureSmokeMain {
     }
 
     private static void checkVersion() {
-        if (!"0.8.1".equals(PureKtav.version())) {
-            throw new AssertionError("expected version 0.8.1, got: " + PureKtav.version());
+        if (!"0.9.0".equals(PureKtav.version())) {
+            throw new AssertionError("expected version 0.9.0, got: " + PureKtav.version());
         }
     }
 
