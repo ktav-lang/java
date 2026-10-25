@@ -8,6 +8,8 @@ export default [
   "formatting",
   "source-edit-status",
   "editing",
+  "editing-cookbook",
+  "diagnostics09",
   "errors",
   "error-writer-rejections",
   "type-mapping",
