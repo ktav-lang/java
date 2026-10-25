@@ -44,8 +44,10 @@ final class Layout {
         if (!isCompound(body)) {
             return candidate;
         }
-        int oldWidth = codePoints(physicalLineText(cb, from));
-        int limit = Math.max(oldWidth, 100);
+        // Reference parity: the limit comes from the SOURCE line, the
+        // growth check from the CANDIDATE line — comparing the candidate
+        // against itself would never fire.
+        int limit = Math.max(codePoints(physicalLineText(source, from)), 100);
         boolean force = requiresBlock(replacement, 0);
         if (!force && codePoints(physicalLineText(cb, from)) <= limit) {
             return candidate;
@@ -322,7 +324,11 @@ final class Layout {
             }
             value = new Value.Str(decoded);
         } else {
-            Value parsed = parseInlineFragment("[" + part + "]", false,
+            // Decode the VALUE slice only — for an object part the whole
+            // part still carries the key prefix, which is not part of
+            // the value being re-planned.
+            String valueText = Bytes.text(cb, vs, pe);
+            Value parsed = parseInlineFragment("[" + valueText + "]", false,
                     "cannot decode moved inline value");
             if (!(parsed instanceof Value.Arr arr) || arr.items().size() != 1) {
                 throw EditError.unsupported(
@@ -645,7 +651,8 @@ final class Layout {
                 return (j + 1 < pos && b[j + 1] == '\n') ? "\r\n" : "\r";
             }
             if (b[j] == '\n') {
-                return "\n";
+                // CRLF: the LF's preceding CR makes the terminator CRLF.
+                return (j > 0 && b[j - 1] == '\r') ? "\r\n" : "\n";
             }
         }
         return "\n";

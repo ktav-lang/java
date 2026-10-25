@@ -173,8 +173,7 @@ final class EditSplice {
                 + plan.body + Bytes.text(b, b1, b.length);
 
         result = Layout.adjust(b, result, tree.root, segments, replacement,
-                from, b1, plan.prefix0.length() + plan.prefix1.length()
-                        + plan.body.length());
+                from, b1, insertedBytes(plan));
 
         // Obligatory semantic verification: reparse and check that
         // exactly the target was replaced.
@@ -201,6 +200,14 @@ final class EditSplice {
                             + " produced");
         }
         return result;
+    }
+
+    /** Insertion size in UTF-8 BYTES — Layout works in byte space. */
+    private static int insertedBytes(Plan plan) {
+        java.nio.charset.Charset utf8 = java.nio.charset.StandardCharsets.UTF_8;
+        return plan.prefix0.getBytes(utf8).length
+                + plan.prefix1.getBytes(utf8).length
+                + plan.body.getBytes(utf8).length;
     }
 
     private static final class Plan {
@@ -808,7 +815,8 @@ final class EditSplice {
                 return (j + 1 < pos && b[j + 1] == '\n') ? "\r\n" : "\r";
             }
             if (b[j] == '\n') {
-                return "\n";
+                // CRLF: the LF's preceding CR makes the terminator CRLF.
+                return (j > 0 && b[j - 1] == '\r') ? "\r\n" : "\n";
             }
         }
         return "\n";
