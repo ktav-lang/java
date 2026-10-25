@@ -173,6 +173,50 @@ equals `Ktav.emitCanonical(Ktav.loads(src))`. The stronger condition is
 deliberate: blank lines are no more part of the `Value` model than
 comments are, so the canonical writer drops them and `format` does not.
 
+> **Unreleased (0.9 preparation):** These editing APIs and updated diagnostics are not included in published 0.8.1 packages. Native backends require the pinned 0.9 core (C ABI 2 for C-FFI); pure backends remain standalone.
+
+### Editing source text
+
+`Ktav.editValue()` replaces an **existing** value in Ktav source text
+and returns new source text — a lossless, byte-level splice, not a
+parse→render round-trip:
+
+```java
+String out = Ktav.editValue("port: 8080\nhost: db\n", "port",
+        new Value.Int("9090"));
+// port: 9090
+// host: db
+```
+
+Only the target's bytes change. Comments, blank lines, key spelling
+and order, the BOM, and the document's LF / CR / CRLF style outside the
+effective edit are preserved exactly. Dotted, inline, and block forms
+survive as they are written; inline wrappers expand only when the
+replacement would hurt readability (a multiline string, line growth
+past `max(100 Unicode scalar values, the old physical line length)`, or
+a replacement needing many escape sequences), and only the touched
+branch expands — untouched nested branches stay inline. A replacement
+equal to the current value is a byte-identical no-op, even for
+noncanonical scalar spellings.
+
+Paths are dotted (`key1.key2.0.key4`); inside a segment `\.` is a
+literal dot and `\\` a literal backslash. `editValueSegments` takes
+already-decoded literal segments instead — a numeric segment is a
+string key inside an object and a zero-based index inside an array.
+There is no create, remove, or rename: only replacement of an existing
+value.
+
+Errors are structured: `EditInvalidPath` (body: the UTF-8 byte offset
+inside the path argument where the defect is), `EditNotFound` (missing
+key, out-of-bounds index, descent through a scalar, empty path), and
+`EditUnsupported` (body: the reason — e.g. a noncontiguous
+dotted-key/reopen target, a structural replacement that would drop
+interior comment lines, or a multiline string containing a bare `))`
+line). Source-level problems still surface as the ordinary parse
+envelopes. The pure backend exposes the same operations as
+`PureKtav.editValue` / `PureKtav.editValueSegments` with identical
+output.
+
 ### Errors
 
 `KtavException` is thrown on any parse or render failure. Beyond a

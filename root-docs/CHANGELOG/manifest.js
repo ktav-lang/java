@@ -1,5 +1,6 @@
 export default [
   "preamble",
+  "source-edit09",
   "unreleased",
   "v0-8-1",
   "v0-8-0",

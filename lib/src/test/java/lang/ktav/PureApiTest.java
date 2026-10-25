@@ -25,7 +25,10 @@ final class PureApiTest {
 
     @Test
     void versionMatchesImplementedSpec() {
-        assertEquals("0.8.1", lang.ktav.pure.PureKtav.version());
+        // The SPEC version the pure backend implements (0.9 source
+        // diagnostics + lossless source edit) — deliberately NOT the
+        // package version, which stays 0.8.1 until release.
+        assertEquals("0.9.0", lang.ktav.pure.PureKtav.version());
     }
 
     // ── Entry points: byte[] vs String agree ────────────────────────────

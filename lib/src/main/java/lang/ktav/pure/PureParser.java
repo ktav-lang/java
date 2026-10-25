@@ -622,7 +622,11 @@ public final class PureParser {
                     && !f.explicit) {
                 continue; // implicit root needs no closer (0.8.1 errata)
             }
-            throw SourceError.unpositioned("UnclosedCompound", "§6.1",
+            // 0.9 location contract: innermost opener..EOF, line and
+            // line_text of the opener (the source is valid UTF-8 here,
+            // so the opener line always decodes).
+            throw SourceError.unclosedCompound(f.openerLine,
+                    Utf8.lineTextAt(ctx.b, f.openerOffset),
                     f.openerOffset, ctx.b.length,
                     "UnclosedCompound: compound opened at line "
                             + f.openerLine + " is never closed");

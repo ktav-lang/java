@@ -10,6 +10,7 @@ import lang.ktav.internal.NativeLib;
 import lang.ktav.internal.WireJson;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Public facade for the Ktav configuration format. Thin wrapper around
@@ -230,6 +231,124 @@ public final class Ktav {
     public static String nativeVersion() {
         String v = NativeLib.get().ktav_version();
         return v == null ? "" : v;
+    }
+
+    // ------------------------------------------------------------------
+    // Lossless source edits (spec 0.9)
+    // ------------------------------------------------------------------
+
+    /**
+     * Replace an existing value addressed by the textual dotted path
+     * ({@code key1.key2.0.key4}; {@code \.} literal dot, {@code \\}
+     * literal backslash) with {@code replacement}, splicing only the
+     * target's bytes. See {@link lang.ktav.pure.PureKtav#editValue} for
+     * the full contract; the native and pure backends produce identical
+     * output.
+     *
+     * @throws KtavException {@code EditInvalidPath} (body: UTF-8 byte
+     *     offset into the path), {@code EditNotFound},
+     *     {@code EditUnsupported}, or an ordinary parse envelope
+     */
+    public static String editValue(String src, String path,
+            Value replacement) {
+        return editValue(bytes(src, "src"), bytes(path, "path"),
+                replacement, false);
+    }
+
+    /** Byte-level variant of {@link #editValue(String, String, Value)}. */
+    public static String editValue(byte[] src, String path,
+            Value replacement) {
+        return editValue(src, bytes(path, "path"), replacement, false);
+    }
+
+    /**
+     * {@link #editValue(String, String, Value)} with pre-decoded literal
+     * segments (no additional unescaping; numeric segment = object key /
+     * zero-based ASCII-digit array index).
+     */
+    public static String editValueSegments(String src,
+            List<String> segments, Value replacement) {
+        return editValue(bytes(src, "src"), WireJson.encodePath(segments),
+                replacement, true);
+    }
+
+    /** Byte-level variant of {@link #editValueSegments(String, List, Value)}. */
+    public static String editValueSegments(byte[] src,
+            List<String> segments, Value replacement) {
+        return editValue(src, WireJson.encodePath(segments), replacement,
+                true);
+    }
+
+    private static byte[] bytes(String s, String arg) {
+        if (s == null) {
+            throw new NullPointerException(arg);
+        }
+        return s.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String editValue(byte[] src, byte[] path,
+            Value replacement, boolean segments) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        if (replacement == null) {
+            throw new NullPointerException("replacement");
+        }
+        byte[] replacementWire = WireJson.encode(replacement);
+        NativeLib lib = NativeLib.get();
+
+        try (Memory srcMem = new Memory(Math.max(1, src.length));
+                Memory pathMem = new Memory(Math.max(1, path.length));
+                Memory replMem = new Memory(
+                        Math.max(1, replacementWire.length))) {
+            if (src.length > 0) {
+                srcMem.write(0, src, 0, src.length);
+            }
+            if (path.length > 0) {
+                pathMem.write(0, path, 0, path.length);
+            }
+            if (replacementWire.length > 0) {
+                replMem.write(0, replacementWire, 0, replacementWire.length);
+            }
+
+            PointerByReference outBuf = new PointerByReference();
+            LongByReference outLen = new LongByReference();
+            PointerByReference outErr = new PointerByReference();
+            LongByReference outErrLen = new LongByReference();
+
+            int rc;
+            try {
+                rc = segments
+                        ? lib.ktav_edit_value_segments(srcMem, src.length,
+                                pathMem, path.length, replMem,
+                                replacementWire.length, outBuf, outLen,
+                                outErr, outErrLen)
+                        : lib.ktav_edit_value(srcMem, src.length, pathMem,
+                                path.length, replMem, replacementWire.length,
+                                outBuf, outLen, outErr, outErrLen);
+            } catch (UnsatisfiedLinkError | NoSuchMethodError e) {
+                // An old native binary simply lacks the 0.9 symbols:
+                // report that clearly instead of silently falling back.
+                throw new KtavException(
+                        "the loaded ktav_cabi native library does not provide"
+                                + " the source-edit entry points; a 0.9 (or"
+                                + " newer) native library is required",
+                        e);
+            }
+
+            if (rc != 0) {
+                byte[] payload = copyAndFreeBytes(lib, outErr.getValue(),
+                        outErrLen.getValue());
+                if (payload.length == 0) {
+                    throw new KtavException(
+                            "native call failed with code " + rc);
+                }
+                throw KtavException.fromEnvelope(ErrorEnvelope.parse(payload));
+            }
+
+            return new String(copyAndFreeBytes(lib, outBuf.getValue(),
+                    outLen.getValue()), StandardCharsets.UTF_8);
+        }
     }
 
     private enum NativeOp {

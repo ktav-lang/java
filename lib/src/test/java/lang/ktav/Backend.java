@@ -33,6 +33,13 @@ interface Backend {
 
     String format(String src);
 
+    /** Lossless source edit by textual path (0.9). */
+    String editValue(String src, String path, Value replacement);
+
+    /** Lossless source edit by decoded segments (0.9). */
+    String editValueSegments(String src, java.util.List<String> segments,
+            Value replacement);
+
     static Backend nativeBackend() {
         return new Backend() {
             @Override public String name() {
@@ -73,6 +80,16 @@ interface Backend {
 
             @Override public String format(String src) {
                 return Ktav.format(src);
+            }
+
+            @Override public String editValue(String src, String path,
+                    Value replacement) {
+                return Ktav.editValue(src, path, replacement);
+            }
+
+            @Override public String editValueSegments(String src,
+                    java.util.List<String> segments, Value replacement) {
+                return Ktav.editValueSegments(src, segments, replacement);
             }
         };
     }
@@ -117,6 +134,18 @@ interface Backend {
 
             @Override public String format(String src) {
                 return lang.ktav.pure.PureKtav.format(src);
+            }
+
+            @Override public String editValue(String src, String path,
+                    Value replacement) {
+                return lang.ktav.pure.PureKtav.editValue(src, path,
+                        replacement);
+            }
+
+            @Override public String editValueSegments(String src,
+                    java.util.List<String> segments, Value replacement) {
+                return lang.ktav.pure.PureKtav.editValueSegments(src,
+                        segments, replacement);
             }
         };
     }

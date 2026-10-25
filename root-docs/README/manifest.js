@@ -6,6 +6,8 @@ export default [
   "build-render",
   "api",
   "formatting",
+  "source-edit-status",
+  "editing",
   "errors",
   "error-writer-rejections",
   "type-mapping",

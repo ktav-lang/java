@@ -1,6 +1,9 @@
 package lang.ktav.pure;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 
 import lang.ktav.Value;
 import lang.ktav.internal.ErrorEnvelope;
@@ -183,7 +186,232 @@ public final class PureKtav {
      * implements.
      */
     public static String version() {
-        return "0.8.1";
+        return "0.9.0";
+    }
+
+    // ------------------------------------------------------------------
+    // Lossless source edits (spec 0.9)
+    // ------------------------------------------------------------------
+
+    /**
+     * Replace an existing value addressed by the textual dotted path
+     * ({@code key1.key2.0.key4}; {@code \.} is a literal dot, {@code \\}
+     * a literal backslash, other escapes and empty segments are
+     * {@code EditInvalidPath}) with {@code replacement}, splicing only
+     * the target's bytes: comments, whitespace, key spelling and order,
+     * BOM, EOL style, and dotted/inline/block forms outside the
+     * effective edit are preserved. The source is never mutated; a
+     * replacement equal to the current value is a byte-identical no-op.
+     *
+     * <p>Errors surface as {@link KtavException} with
+     * {@code getError()} equal to {@code EditInvalidPath} (body: the
+     * UTF-8 byte offset inside the path argument),
+     * {@code EditNotFound}, or {@code EditUnsupported} (body: the
+     * reason). Parse errors of the source are the ordinary 0.9 parser
+     * envelopes.
+     */
+    public static String editValue(String src, String path,
+            Value replacement) {
+        return editValue(encoded(src), path, replacement);
+    }
+
+    /** Byte-level variant of {@link #editValue(String, String, Value)}. */
+    public static String editValue(byte[] src, String path,
+            Value replacement) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        if (replacement == null) {
+            throw new NullPointerException("replacement");
+        }
+        // Source-first, mirroring the C ABI contract: UTF-8 validation
+        // and a full grammar parse run BEFORE the path/transport decode,
+        // so a damaged source reports its parse envelope even when the
+        // path argument is also malformed.
+        Validated v = parseSourceFirst(src);
+        replacement = canonicalizeWire(replacement);
+        List<String> segments = EditPath.parse(pathBytes(path));
+        return applyEdit(v, segments, replacement);
+    }
+
+    /**
+     * {@link #editValue(String, String, Value)} with pre-decoded
+     * literal segments: no additional unescaping is performed. A
+     * numeric segment addresses a string key inside an Object and a
+     * zero-based ASCII-digit index inside an Array.
+     */
+    public static String editValueSegments(String src,
+            List<String> segments, Value replacement) {
+        return editValueSegments(encoded(src), segments, replacement);
+    }
+
+    /** Byte-level variant of {@link #editValueSegments(String, List, Value)}. */
+    public static String editValueSegments(byte[] src,
+            List<String> segments, Value replacement) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        if (segments == null) {
+            throw new NullPointerException("segments");
+        }
+        if (replacement == null) {
+            throw new NullPointerException("replacement");
+        }
+        // Source-first (C ABI contract): the source is validated and
+        // parsed before the transport decode (replacement canonicalize
+        // and the empty-segments NotFound decision), so a damaged source
+        // wins over every transport-level error.
+        Validated v = parseSourceFirst(src);
+        replacement = canonicalizeWire(replacement);
+        if (segments.isEmpty()) {
+            throw editFailure(lang.ktav.internal.ErrorEnvelope.of(
+                    "EditNotFound", null, null, null, null, null, null,
+                    null, null, null,
+                    "edit path does not address an existing value"));
+        }
+        return applyEdit(v, segments, replacement);
+    }
+
+    /** Validate UTF-8, locate the BOM, and parse the source — first. */
+    private static Validated parseSourceFirst(byte[] src) {
+        try {
+            Validated v = validated(src);
+            PureParser.parse(v.b, v.start, false);
+            return v;
+        } catch (SourceError e) {
+            throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
+                    e.reason, e.line, e.lineText, e.spanStart, e.spanEnd,
+                    e.path, e.body, e.canonical, e.specSection,
+                    e.getMessage()));
+        }
+    }
+
+    /** Splice an already-validated source; converts edit errors. */
+    private static String applyEdit(Validated v, List<String> segments,
+            Value replacement) {
+        try {
+            return EditSplice.apply(v.b, v.start, segments, replacement);
+        } catch (EditError e) {
+            throw editFailure(envelopeFor(e));
+        } catch (SourceError e) {
+            throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
+                    e.reason, e.line, e.lineText, e.spanStart, e.spanEnd,
+                    e.path, e.body, e.canonical, e.specSection,
+                    e.getMessage()));
+        }
+    }
+
+    /**
+     * Canonicalize a replacement the way the C ABI does when it decodes
+     * the wire ({@code cabi::wire canonical_integer / canonical_float}):
+     * {@link Value.Int} loses any {@code +} sign, redundant leading
+     * zeros, and signed zero (string-level — arbitrary precision is
+     * preserved, never i64-limited); {@link Value.Flt} must contain a
+     * {@code .} or exponent and re-rounds to the crate's canonical
+     * shortest form, with a non-finite result passing through verbatim
+     * (the writers reject it later, fail closed). An invalid payload is
+     * a wire-transport violation: a {@code Message} envelope without an
+     * invented source location. Value semantics elsewhere (the records
+     * themselves, the dumps guard) are untouched — this runs ONLY at the
+     * edit boundary, so {@code new Value.Int("+0001")} over {@code n: 1}
+     * is the same byte-identical no-op the native backend produces.
+     */
+    static Value canonicalizeWire(Value v) {
+        if (v instanceof Value.Int i) {
+            return new Value.Int(canonicalInteger(i.text()));
+        }
+        if (v instanceof Value.Flt f) {
+            return new Value.Flt(canonicalFloatPayload(f.text()));
+        }
+        if (v instanceof Value.Obj o) {
+            LinkedHashMap<String, Value> out = new LinkedHashMap<>();
+            o.entries().forEach((k, val) -> out.put(k, canonicalizeWire(val)));
+            return new Value.Obj(out);
+        }
+        if (v instanceof Value.Arr a) {
+            List<Value> out = new ArrayList<>(a.items().size());
+            for (Value item : a.items()) {
+                out.add(canonicalizeWire(item));
+            }
+            return new Value.Arr(out);
+        }
+        return v;
+    }
+
+    /** Mirror of {@code canonical_integer}: string-level, not i64-parsed. */
+    private static String canonicalInteger(String s) {
+        String sign;
+        String digits;
+        if (s.startsWith("-")) {
+            sign = "-";
+            digits = s.substring(1);
+        } else if (s.startsWith("+")) {
+            sign = "";
+            digits = s.substring(1);
+        } else {
+            sign = "";
+            digits = s;
+        }
+        if (digits.isEmpty()
+                || !digits.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            throw wireMessage("$i payload not an integer literal: \""
+                    + s + "\"");
+        }
+        String trimmed = digits.replaceFirst("^0+", "");
+        return trimmed.isEmpty() ? "0" : sign + trimmed;
+    }
+
+    /** Mirror of {@code canonical_float}: f64 parse + canonical shortest form. */
+    private static String canonicalFloatPayload(String s) {
+        double val;
+        try {
+            val = Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            throw wireMessage("$f payload not a finite decimal: \""
+                    + s + "\"");
+        }
+        if (s.indexOf('.') < 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
+            throw wireMessage("$f payload must contain '.' or exponent: \""
+                    + s + "\"");
+        }
+        if (!Double.isFinite(val)) {
+            // Deliberate wire-only capability: passed through verbatim;
+            // the § 5.9.0 writers reject it at render time (fail closed).
+            return s;
+        }
+        return Scalars.canonicalFloat(val);
+    }
+
+    private static KtavException wireMessage(String text) {
+        return KtavException.fromEnvelope(ErrorEnvelope.of(
+                "Message", null, null, null, null, null, null, null, null,
+                null, text));
+    }
+
+    static byte[] pathBytes(String path) {
+        if (path == null) {
+            throw new NullPointerException("path");
+        }
+        return path.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static lang.ktav.internal.ErrorEnvelope envelopeFor(EditError e) {
+        return switch (e.code) {
+            case INVALID_PATH -> ErrorEnvelope.of(
+                    "EditInvalidPath", null, null, null, null, null, null,
+                    String.valueOf(e.offset), null, null, e.getMessage());
+            case NOT_FOUND -> ErrorEnvelope.of(
+                    "EditNotFound", null, null, null, null, null, null,
+                    null, null, null, e.getMessage());
+            case UNSUPPORTED -> ErrorEnvelope.of(
+                    "EditUnsupported", null, null, null, null, null, null,
+                    e.reason, null, null, e.getMessage());
+        };
+    }
+
+    private static KtavException editFailure(
+            lang.ktav.internal.ErrorEnvelope env) {
+        return KtavException.fromEnvelope(env);
     }
 
     private static byte[] encoded(String src) {
