@@ -66,6 +66,20 @@ final class SourceError extends RuntimeException {
                 specSection);
     }
 
+    /**
+     * UnclosedCompound with the 0.9 location contract: the span covers
+     * the innermost opener through EOF and the line/line_text describe
+     * the opener's 1-based line (decoded from the VALID source — the
+     * opener offset always sits inside valid UTF-8 here).
+     */
+    static SourceError unclosedCompound(int openerLine, String openerLineText,
+            int spanStart, int spanEnd, String message) {
+        return new SourceError(message, "UnclosedCompound", null,
+                (long) openerLine, openerLineText,
+                (long) spanStart, (long) spanEnd,
+                null, null, null, "§6.1");
+    }
+
     /** Error carrying decoded/raw key path segments. */
     static SourceError withPath(String error, String specSection, int line,
             String lineText, int spanStart, int spanEnd, List<String> path,

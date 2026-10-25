@@ -20,30 +20,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 final class CorpusGuardMutationTest {
 
-    private static final String KNOWN_GOOD = """
-            {
-              "$comment": "known-good manifest shape (spec § 8.5 / § 6.15)",
-              "schema_version": 1,
-              "categories": {
-                "valid": {"count": 228},
-                "invalid": {"count": 90},
-                "unrepresentable": {"count": 5},
-                "parseable-unrepresentable": {"count": 4},
-                "strict-lossy": {"count": 13}
-              },
-              "fixture_flags": [
-                {"category": "invalid", "fixture": "invalid_utf8/f1", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f2", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f3", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f4", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f5", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f6", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f7", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f8", "flags": ["raw_bytes"]},
-                {"category": "invalid", "fixture": "invalid_utf8/f9", "flags": ["raw_bytes"]}
-              ]
-            }
-            """;
+    private static final String KNOWN_GOOD = buildKnownGood();
+
+    /**
+     * 0.9 baseline: invalid grew 90 → 162 (30 EOF + 42 malformed-UTF-8
+     * diagnostics09) and raw_bytes grew 9 → 51 (9 legacy + 42 new). The
+     * synthetic manifest must mirror the real 0.9 corpus shape, or the
+     * "known-good" control would itself be a mutation.
+     */
+    private static String buildKnownGood() {
+        StringBuilder sb = new StringBuilder("""
+                {
+                  "$comment": "known-good manifest shape (spec § 8.5 / § 6.15, 0.9)",
+                  "schema_version": 1,
+                  "categories": {
+                    "valid": {"count": 228},
+                    "invalid": {"count": 162},
+                    "unrepresentable": {"count": 5},
+                    "parseable-unrepresentable": {"count": 4},
+                    "strict-lossy": {"count": 13}
+                  },
+                  "fixture_flags": [
+                """);
+        for (int i = 1; i <= 51; i++) {
+            sb.append("        {\"category\": \"invalid\", \"fixture\": \"raw/f")
+                    .append(i).append("\", \"flags\": [\"raw_bytes\"]}");
+            sb.append(i == 51 ? "\n" : ",\n");
+        }
+        sb.append("      ]\n    }");
+        return sb.toString();
+    }
 
     @TempDir
     Path temp;
@@ -87,7 +93,7 @@ final class CorpusGuardMutationTest {
     @Test
     void missingCategoryIsNamedByClosedSetMessage() throws IOException {
         assertReadFailsNaming(KNOWN_GOOD.replace(
-                "    \"invalid\": {\"count\": 90},\n", ""),
+                "    \"invalid\": {\"count\": 162},\n", ""),
                 "do not match the closed set", "expected exactly");
     }
 
@@ -110,17 +116,17 @@ final class CorpusGuardMutationTest {
     @Test
     void unimplementedFlagIsNamed() throws IOException {
         assertReadFailsNaming(KNOWN_GOOD.replace(
-                "\"fixture\": \"invalid_utf8/f1\", \"flags\": [\"raw_bytes\"]",
-                "\"fixture\": \"invalid_utf8/f1\", \"flags\": [\"raw_bytes_x\"]"),
+                "\"fixture\": \"raw/f1\", \"flags\": [\"raw_bytes\"]",
+                "\"fixture\": \"raw/f1\", \"flags\": [\"raw_bytes_x\"]"),
                 "raw_bytes_x", "only raw_bytes");
     }
 
     @Test
     void wrongRawBytesFlagCountIsNamed() throws IOException {
         assertReadFailsNaming(KNOWN_GOOD.replace(
-                "{\"category\": \"invalid\", \"fixture\": \"invalid_utf8/f8\","
+                "{\"category\": \"invalid\", \"fixture\": \"raw/f50\","
                         + " \"flags\": [\"raw_bytes\"]},\n", ""),
-                "exactly 9");
+                "exactly 51");
     }
 
     // ── Canonical-companion guard (spec § 5.9.10) ──────────────────────

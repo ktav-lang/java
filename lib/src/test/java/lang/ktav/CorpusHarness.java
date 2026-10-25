@@ -52,7 +52,7 @@ final class CorpusHarness {
     private static final Map<String, Integer> EXPECTED_CATEGORIES =
             new LinkedHashMap<>(Map.of(
                     "valid", 228,
-                    "invalid", 90,
+                    "invalid", 162,
                     "unrepresentable", 5,
                     "parseable-unrepresentable", 4,
                     "strict-lossy", 13));
@@ -62,7 +62,7 @@ final class CorpusHarness {
      * {@code raw_bytes} (spec § 6.15). A different count is a corpus
      * shape the runner does not understand.
      */
-    private static final int EXPECTED_RAW_BYTES_FLAGS = 9;
+    private static final int EXPECTED_RAW_BYTES_FLAGS = 51;
 
     private CorpusHarness() {
     }
@@ -384,42 +384,113 @@ final class CorpusHarness {
     private static void runInvalid(Backend backend, Path ktavPath, Set<String> rawByteFixtures)
             throws IOException {
         Path oraclePath = oracleFor(ktavPath);
-        String expected = expectedError(oraclePath, ktavPath);
+        Value oracle = WireJson.decode(Files.readAllBytes(oraclePath));
+        Value field = ((Value.Obj) oracle).entries().get("expected_error");
+        if (!(field instanceof Value.Str)) {
+            fail("oracle for " + ktavPath + " has no string \"expected_error\": " + oraclePath);
+        }
+        String expected = ((Value.Str) field).value();
+        long[] location = expectedLocation(oracle, oraclePath, ktavPath);
         String stem = TestPaths.SPEC.relativize(ktavPath).toString().replace('\\', '/');
         stem = stem.substring(0, stem.length() - ".ktav".length());
         byte[] raw = Files.readAllBytes(ktavPath);
 
+        KtavException e;
         if (rawByteFixtures.contains(stem)) {
             try {
                 strictDecodeUtf8(raw);
                 fail("fixture " + ktavPath + " is flagged raw_bytes in manifest.json"
                         + " but decodes as UTF-8 — the flag is wrong, not the decoder");
-            } catch (CharacterCodingException e) {
+            } catch (CharacterCodingException ex) {
                 // Expected: the strict decoder refuses the bytes.
             }
             assertEquals("InvalidUtf8", expected,
                     "oracle for raw_bytes fixture " + ktavPath + " must expect InvalidUtf8");
-            KtavException e = assertThrowsKtav(() -> backend.loads(raw),
+            e = assertThrowsKtav(() -> backend.loads(raw),
                     "byte[] entry must reject invalid UTF-8: " + ktavPath);
-            assertEquals("InvalidUtf8", e.getError(),
-                    "error class for raw_bytes fixture " + ktavPath);
-            assertNotNull(e.getSpanStart(), "span start for " + ktavPath);
-            assertNotNull(e.getSpanEnd(), "span end for " + ktavPath);
-            assertTrue(e.getSpanEnd() > e.getSpanStart(),
-                    "InvalidUtf8 span must be non-empty: " + ktavPath);
-            return;
+        } else {
+            try {
+                strictDecodeUtf8(raw);
+            } catch (CharacterCodingException ex) {
+                fail("fixture " + ktavPath + " is not valid UTF-8 but is not flagged raw_bytes"
+                        + " in manifest.json — add a fixture_flags entry for it");
+            }
+            String src = new String(raw, StandardCharsets.UTF_8);
+            e = assertThrowsKtav(() -> backend.loads(src),
+                    "expected parse error for " + ktavPath);
         }
 
-        try {
-            strictDecodeUtf8(raw);
-        } catch (CharacterCodingException e) {
-            fail("fixture " + ktavPath + " is not valid UTF-8 but is not flagged raw_bytes"
-                    + " in manifest.json — add a fixture_flags entry for it");
-        }
-        String src = new String(raw, StandardCharsets.UTF_8);
-        KtavException e = assertThrowsKtav(() -> backend.loads(src),
-                "expected parse error for " + ktavPath);
         assertEquals(expected, e.getError(), "error class for " + ktavPath);
+        if (location != null) {
+            // 0.9 expected_location: line/start and exactly one end or
+            // minimum_end; raw-byte UTF-8 offsets, BOM included.
+            assertTrue(location[0] >= 1, "line must be >= 1 for " + ktavPath);
+            assertEquals(location[0], e.getLine() == null ? -1 : e.getLine(),
+                    "line for " + ktavPath);
+            assertEquals(location[1], e.getSpanStart() == null ? -1 : e.getSpanStart(),
+                    "span start for " + ktavPath);
+            if (location[3] != 0) { // minimum_end variant
+                assertTrue(e.getSpanEnd() != null
+                                && e.getSpanEnd() >= location[3],
+                        "span end must be >= minimum_end " + location[3]
+                                + " for " + ktavPath + " (got " + e.getSpanEnd() + ")");
+            } else {
+                assertEquals(location[2], e.getSpanEnd() == null ? -1 : e.getSpanEnd(),
+                        "span end for " + ktavPath);
+            }
+            assertTrue(e.getSpanEnd() == null || e.getSpanEnd() > e.getSpanStart(),
+                    "span must be non-empty: " + ktavPath);
+            if ("InvalidUtf8".equals(expected)) {
+                assertTrue(e.getLineText() == null,
+                        "line_text must be null for invalid UTF-8: " + ktavPath);
+            }
+        }
+    }
+
+    /**
+     * Read the oracle's optional {@code expected_location} object:
+     * {@code line}, {@code start}, and EXACTLY one of {@code end} /
+     * {@code minimum_end}. Returns {line, start, end, minimumEndFlag}
+     * or null when the oracle carries no location metadata (pre-0.9
+     * fixtures).
+     */
+    private static long[] expectedLocation(Value oracle, Path oraclePath,
+            Path ktavPath) {
+        Value loc = ((Value.Obj) oracle).entries().get("expected_location");
+        if (loc == null) {
+            return null;
+        }
+        assertTrue(loc instanceof Value.Obj,
+                "expected_location must be an object: " + oraclePath);
+        Map<String, Value> m = ((Value.Obj) loc).entries();
+        long line = intField(m, "line", oraclePath, ktavPath);
+        long start = intField(m, "start", oraclePath, ktavPath);
+        Value end = m.get("end");
+        Value minEnd = m.get("minimum_end");
+        assertTrue(end == null || end instanceof Value.Int,
+                "end must be a number: " + oraclePath);
+        assertTrue(minEnd == null || minEnd instanceof Value.Int,
+                "minimum_end must be a number: " + oraclePath);
+        assertTrue(end != null ^ minEnd != null,
+                "expected_location must carry exactly one of end/"
+                        + "minimum_end: " + oraclePath);
+        if (end instanceof Value.Int e) {
+            long[] out = { line, start, e.text().isEmpty() ? -1
+                    : Long.parseLong(e.text()), 0 };
+            assertTrue(out[2] > start, "end must exceed start: " + oraclePath);
+            return out;
+        }
+        long min = Long.parseLong(((Value.Int) minEnd).text());
+        assertTrue(min > start, "minimum_end must exceed start: " + oraclePath);
+        return new long[] { line, start, -1, min };
+    }
+
+    private static long intField(Map<String, Value> m, String name,
+            Path oraclePath, Path ktavPath) {
+        Value v = m.get(name);
+        assertTrue(v instanceof Value.Int,
+                "expected_location." + name + " must be a number: " + oraclePath);
+        return Long.parseLong(((Value.Int) v).text());
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────

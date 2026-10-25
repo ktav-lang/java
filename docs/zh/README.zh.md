@@ -168,6 +168,41 @@ System.out.print(Ktav.format("## the server\nserver: {host: a, port: 80}\n"));
 与注释一样都不属于 `Value` 模型，所以规范 writer 会丢弃它们，而
 `format` 不会。
 
+> **尚未发布（0.9 准备版本）：** 这些编辑 API 和更新后的诊断不包含在已发布的 0.8.1 包中。原生后端需要固定的 0.9 核心（C-FFI 使用 C ABI 2）；纯实现仍完全独立。
+
+### 编辑源文本
+
+`Ktav.editValue()` 替换 Ktav 源文本中**已存在**的值并返回新的源文本
+—— 这是字节级的无损拼接（splice），而不是 parse→render 往返：
+
+```java
+String out = Ktav.editValue("port: 8080\nhost: db\n", "port",
+        new Value.Int("9090"));
+// port: 9090
+// host: db
+```
+
+只有目标的字节会改变。注释、空行、键的拼写与顺序、BOM 以及有效编辑
+范围之外的 LF / CR / CRLF 行尾风格都原样保留。dotted、inline 和块
+形式按原样保留；仅当替换会损害可读性时（多行字符串、行长超过
+`max(100 个 Unicode 标量值, 原物理行长)`、或需要大量转义序列的替换），
+inline 包装才会展开，且只展开受影响的分支——未触及的嵌套分支保持
+inline。与当前值相等的替换是字节完全一致的 no-op，即使标量拼写不
+规范也一样。
+
+路径以点分隔（`key1.key2.0.key4`）；段内 `\.` 表示字面点号，`\\`
+表示字面反斜杠。`editValueSegments` 直接接收已解码的字面段——数字段
+在对象中是字符串键，在数组中是从零开始的索引。不支持创建、删除或重
+命名——只支持替换已存在的值。
+
+错误是结构化的：`EditInvalidPath`（body：路径参数中发现缺陷处的
+UTF-8 字节偏移）、`EditNotFound`（缺少键、索引越界、穿过标量下降、
+空路径）和 `EditUnsupported`（body：原因——例如由 dotted 键与 reopen
+拼成的非连续目标、会丢失容器内部注释的结构性替换，或包含独立成行的
+`))` 的多行字符串）。源文本本身的问题仍以普通解析错误 envelope 报告。
+纯 Java 后端提供相同操作——`PureKtav.editValue` /
+`PureKtav.editValueSegments`，输出完全一致。
+
 ### 错误
 
 解析或渲染失败时抛出 `KtavException`。除了人类可读的 `getMessage()`

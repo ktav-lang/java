@@ -72,16 +72,61 @@ public interface NativeLib extends Library {
             PointerByReference outErr,
             LongByReference outErrLen);
 
+    int ktav_edit_value(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            Pointer replacement,
+            long replacementLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
+    int ktav_edit_value_segments(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            Pointer replacement,
+            long replacementLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
     void ktav_free(Pointer ptr, long len);
 
     String ktav_version();
+
+    /** ABI version reported by the loaded native library. */
+    int ktav_abi_version();
+
+    /**
+     * The ABI version this binding is built against. 0.9 raises it from
+     * 1 to 2 (the exported set grew by the source-edit symbols); an
+     * ABI-1 native binary is REJECTED with a clear version-mismatch
+     * error — never silently used, never hidden behind a pure fallback.
+     */
+    int EXPECTED_ABI_VERSION = 2;
 
     final class Holder {
         private static final NativeLib INSTANCE = loadSingleton();
 
         private static NativeLib loadSingleton() {
             String path = NativeLoader.resolve();
-            return Native.load(path, NativeLib.class);
+            NativeLib lib = Native.load(path, NativeLib.class);
+            int abi = lib.ktav_abi_version();
+            if (abi != EXPECTED_ABI_VERSION) {
+                throw new IllegalStateException(
+                        "ktav_cabi ABI version mismatch: loaded library "
+                                + "reports ABI " + abi + " but this binding"
+                                + " requires ABI " + EXPECTED_ABI_VERSION
+                                + " (source-edit entry points need the 0.9"
+                                + " native library): " + path);
+            }
+            return lib;
         }
 
         private Holder() {

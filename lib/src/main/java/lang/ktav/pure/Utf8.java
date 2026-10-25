@@ -81,8 +81,9 @@ final class Utf8 {
     private static void fail(byte[] bytes, int start, int len) {
         int end = Math.min(start + Math.max(len, 1), bytes.length);
         int line = lineAt(bytes, start);
-        String lineText = lineTextAt(bytes, start);
-        throw SourceError.invalidUtf8(line, lineText, start, end);
+        // 0.9: line_text is null for malformed UTF-8 — the source is not
+        // valid text, so decoding a line would invent characters.
+        throw SourceError.invalidUtf8(line, null, start, end);
     }
 
     /** 1-based line containing byte offset {@code pos}, over raw § 3.2 terminators. */

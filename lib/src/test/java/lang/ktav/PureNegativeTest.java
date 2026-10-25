@@ -33,13 +33,56 @@ final class PureNegativeTest {
     // ── Compound structure ──────────────────────────────────────────────
 
     @Test
-    void unclosedExplicitRootSpansOpenerToEofWithoutALine() {
+    void unclosedExplicitRootSpansOpenerToEofWithTheOpenerLine() {
         KtavException e = err("a: [");
         assertEquals("UnclosedCompound", e.getError());
         assertEquals("§6.1", e.getSpecSection());
-        assertNull(e.getLine(), "UnclosedCompound carries a span, not a line");
+        // 0.9 location contract: the span is opener..EOF, and the line
+        // number AND line_text describe the opener (valid UTF-8 source,
+        // so the opener line always decodes).
+        assertEquals(1L, e.getLine(), "line is the opener's line");
+        assertEquals("a: [", e.getLineText(), "line_text is the opener line");
         assertEquals(3L, e.getSpanStart(), "span starts at the opener byte");
         assertEquals(4L, e.getSpanEnd(), "span ends at EOF");
+    }
+
+    /**
+     * 0.9 opener-line regressions: line counting is over raw § 3.2
+     * terminators (LF, lone CR, CRLF — one EOL each) and the line_text
+     * strips exactly one trailing CR; the BOM does not rebase offsets.
+     */
+    @Test
+    void unclosedCompoundOpenerLineOverLfCrCrlfAndBom() {
+        KtavException lf = err("k: 1\na: [");
+        assertEquals(2L, lf.getLine(), "LF: opener on line 2");
+        assertEquals("a: [", lf.getLineText());
+        assertEquals(8L, lf.getSpanStart(), "opener is the '[' byte, not the line start");
+
+        KtavException cr = err("k: 1\ra: [");
+        assertEquals(2L, cr.getLine(), "lone CR: opener on line 2");
+        assertEquals("a: [", cr.getLineText());
+        assertEquals(8L, cr.getSpanStart());
+
+        KtavException crlf = err("k: 1\r\na: [");
+        assertEquals(2L, crlf.getLine(), "CRLF is ONE terminator");
+        assertEquals("a: [", crlf.getLineText(),
+                "line_text strips exactly one trailing CR");
+        assertEquals(9L, crlf.getSpanStart());
+
+        KtavException bom = err("\uFEFFk: 1\na: [");
+        assertEquals(2L, bom.getLine());
+        assertEquals("a: [", bom.getLineText());
+        assertEquals(11L, bom.getSpanStart(),
+                "BOM stays in the raw coordinates (3 + 8)");
+
+        // Multiline opener: the span starts at the '(' byte itself
+        // (0.9 diagnostics09), not at the opening pair's line start.
+        KtavException ml = err("k: (\nx");
+        assertEquals("UnclosedCompound", ml.getError());
+        assertEquals(1L, ml.getLine());
+        assertEquals("k: (", ml.getLineText());
+        assertEquals(3L, ml.getSpanStart());
+        assertEquals(6L, ml.getSpanEnd());
     }
 
     @Test
@@ -347,9 +390,10 @@ final class PureNegativeTest {
         assertEquals("InvalidUtf8", e.getError());
         assertEquals("§6.15", e.getSpecSection());
         assertEquals(1L, e.getLine());
-        // lineText is the raw line DECODED as UTF-8; the invalid byte
-        // becomes U+FFFD, and the text ends where the line ends.
-        assertEquals("a: [1, \uFFFD]", e.getLineText());
+        // 0.9: line_text is NULL for invalid UTF-8 — the source is not
+        // valid text, so no line may be decoded (a lossily decoded line
+        // with U+FFFD would pretend the source was valid).
+        assertNull(e.getLineText(), "line_text must be null for InvalidUtf8");
         assertEquals(7L, e.getSpanStart(), "span starts at the first invalid byte");
         assertEquals(8L, e.getSpanEnd());
     }
@@ -376,8 +420,7 @@ final class PureNegativeTest {
         assertEquals("InvalidUtf8", e.getError());
         assertEquals(3L, e.getSpanStart(), "span starts at the truncated lead byte");
         assertEquals(5L, e.getSpanEnd(), "truncated sequence clamps at EOF");
-        assertEquals("a: \uFFFD", e.getLineText(),
-                "raw line decoded with replacement for the truncated bytes");
+        assertNull(e.getLineText(), "0.9: line_text null for InvalidUtf8");
     }
 
     @Test

@@ -62,6 +62,25 @@ public final class WireJson {
         return out.toByteArray();
     }
 
+    /**
+     * Encode an edit path as the UTF-8 JSON transport array of literal
+     * (already-decoded) segment strings — the second-argument wire form
+     * of {@code ktav_edit_value_segments}.
+     */
+    public static byte[] encodePath(List<String> segments) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(64);
+        try (JsonGenerator g = FACTORY.createGenerator(out)) {
+            g.writeStartArray();
+            for (String s : segments) {
+                g.writeString(s);
+            }
+            g.writeEndArray();
+        } catch (IOException e) {
+            throw new KtavException("encode JSON path: " + e.getMessage(), e);
+        }
+        return out.toByteArray();
+    }
+
     private static Value readValue(JsonParser p, JsonToken t) throws IOException {
         return switch (t) {
             case VALUE_NULL -> Value.Null.NULL;

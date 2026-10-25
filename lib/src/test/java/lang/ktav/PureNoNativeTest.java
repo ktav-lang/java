@@ -64,7 +64,8 @@ final class PureNoNativeTest {
 
     @Test
     void versionNeedsNoNative() {
-        assertEquals("0.8.1", lang.ktav.pure.PureKtav.version());
+        // Spec version (0.9), not the package version.
+        assertEquals("0.9.0", lang.ktav.pure.PureKtav.version());
     }
 
     @Test
