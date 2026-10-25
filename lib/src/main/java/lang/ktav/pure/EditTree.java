@@ -474,7 +474,7 @@ final class EditTree {
     static final int SHAPE_INLINE_VALUE = 8;
 
     /** {@code from} is already the first non-whitespace byte. */
-    static int classifyValueShape(int from, int end) {
+    private int classifyValueShape(int from, int end) {
         int len = end - from;
         if (len == 1) {
             byte c = b0(from);
