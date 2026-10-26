@@ -67,8 +67,48 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Build native library
         run: cargo build --release -p ktav-cabi
+
+      - name: Verify generated lockfile uses the pinned core revision
+        shell: bash
+        run: |
+          python - <<'PY'
+          import tomllib
+          with open('Cargo.lock', 'rb') as source:
+              packages = tomllib.load(source)['package']
+          core = [package for package in packages if package['name'] == 'ktav']
+          expected_source = 'git+https://github.com/ktav-lang/rust?rev=861c64a8378242b87b66b7d7bfeb119996ce3643#861c64a8378242b87b66b7d7bfeb119996ce3643'
+          if len(core) != 1 or core[0].get('source') != expected_source:
+              raise SystemExit(f'expected exactly one ktav from pinned git revision; found {core!r}')
+          print('generated lockfile resolves ktav from the pinned core revision')
+          PY
+
+      - name: Verify required native ABI symbols
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          nm -D --defined-only target/release/libktav_cabi.so | awk '{print $3}' | python -c '
+          import sys
+          required = {
+              "ktav_loads", "ktav_loads_strict", "ktav_dumps", "ktav_dumps_force_strings",
+              "ktav_emit_canonical", "ktav_format", "ktav_canonical_from_source",
+              "ktav_edit_value", "ktav_edit_value_segments", "ktav_insert_value",
+              "ktav_insert_value_segments", "ktav_remove_value", "ktav_remove_value_segments",
+              "ktav_rename_key", "ktav_rename_key_segments", "ktav_free", "ktav_version",
+              "ktav_abi_version",
+          }
+          exported = set(sys.stdin.read().split())
+          missing = sorted(required - exported)
+          if missing:
+              raise SystemExit("missing native ABI symbols: " + ", ".join(missing))
+          print("required native ABI symbols are exported")
+          '
 
       - name: Gradle test
         run: ./gradlew :lib:test --no-daemon --stacktrace
@@ -244,8 +284,26 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Build DEBUG native library
         run: cargo build -p ktav-cabi
+
+      - name: Verify generated lockfile uses the pinned core revision
+        shell: bash
+        run: |
+          python - <<'PY'
+          import tomllib
+          with open('Cargo.lock', 'rb') as source:
+              packages = tomllib.load(source)['package']
+          core = [package for package in packages if package['name'] == 'ktav']
+          expected_source = 'git+https://github.com/ktav-lang/rust?rev=861c64a8378242b87b66b7d7bfeb119996ce3643#861c64a8378242b87b66b7d7bfeb119996ce3643'
+          if len(core) != 1 or core[0].get('source') != expected_source:
+              raise SystemExit(f'expected exactly one ktav from pinned git revision; found {core!r}')
+          print('generated lockfile resolves ktav from the pinned core revision')
+          PY
 
       - name: Empty-input tests against the real debug artifact
         env:
