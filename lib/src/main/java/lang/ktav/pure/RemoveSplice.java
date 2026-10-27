@@ -11,8 +11,7 @@ import lang.ktav.Value;
 final class RemoveSplice {
     private RemoveSplice() { }
 
-    static String apply(byte[] source, int bomStart, List<String> segments) {
-        Value original = PureParser.parse(source, bomStart, false);
+    static String apply(byte[] source, int bomStart, Value original, List<String> segments) {
         if (segments.isEmpty()) throw EditError.notFound();
         EditTree.Result tree = EditTree.build(source);
         Parent parent = parent(original, segments);

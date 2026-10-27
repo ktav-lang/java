@@ -188,6 +188,7 @@ jobs:
           --tests "lang.ktav.PureWhitespaceTest"
           --tests "lang.ktav.PureInsertValueTest"
           --tests "lang.ktav.PureRemoveRenameTest"
+          --tests "lang.ktav.PureMutationSourceFirstReuseTest"
 
       - name: Upload test reports
         if: failure()
@@ -261,12 +262,19 @@ jobs:
           retention-days: 14
 
   source-edit-benchmark:
-    name: source edit benchmark (native + pure)
+    name: source edit benchmark (base vs candidate)
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
+          path: candidate
+          submodules: recursive
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ad96c71e75ecb683b5698d6af6d82efd700c8de0
+          path: baseline
           submodules: recursive
 
       - uses: dtolnay/rust-toolchain@stable
@@ -279,28 +287,38 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build native library
-        run: cargo build --release -p ktav-cabi
-
-      - name: Run source edit benchmark
+      - name: Build native libraries in isolated workspaces
         shell: bash
-        env:
-          KTAV_LIB_PATH: ${{ github.workspace }}/target/release/libktav_cabi.so
         run: |
           set -euo pipefail
+          cargo build --manifest-path baseline/Cargo.toml --release -p ktav-cabi --target-dir baseline/target
+          cargo build --manifest-path candidate/Cargo.toml --release -p ktav-cabi --target-dir candidate/target
+
+      - name: Run identical harness in alternating independent JVMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp candidate/lib/src/test/java/lang/ktav/SourceEditBenchmark.java baseline/lib/src/test/java/lang/ktav/SourceEditBenchmark.java
           {
-            echo "github_sha=${GITHUB_SHA}"
+            echo "baseline_sha=ad96c71e75ecb683b5698d6af6d82efd700c8de0"
+            echo "candidate_sha=${GITHUB_SHA}"
             echo "runner_os=${RUNNER_OS}"
             echo "runner_arch=${RUNNER_ARCH}"
             echo "run_id=${GITHUB_RUN_ID}"
             echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
             echo "event_name=${GITHUB_EVENT_NAME}"
             echo "ref=${GITHUB_REF}"
-            echo "workflow=${GITHUB_WORKFLOW}"
             rustc --version
             cargo --version
             java -version
-            ./gradlew :lib:sourceEditBenchmark --no-daemon --stacktrace
+            for round in 1 2 3 4 5; do
+              if (( round % 2 == 1 )); then first=baseline; second=candidate; else first=candidate; second=baseline; fi
+              for side in "$first" "$second"; do
+                echo "===== round=${round} side=${side} ====="
+                JAVA_TOOL_OPTIONS='-Dktav.bench.repeats=1' KTAV_LIB_PATH="$GITHUB_WORKSPACE/$side/target/release/libktav_cabi.so" \
+                  ./"$side"/gradlew -p "$side" :lib:sourceEditBenchmark --no-daemon --stacktrace
+              done
+            done
           } 2>&1 | tee source-edit-benchmark.log
 
       - name: Upload benchmark measurements and output
