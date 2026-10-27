@@ -25,6 +25,8 @@ For pure-only Gradle use, disable transitive dependencies:
 implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 ```
 
+For Maven, exclude both `net.java.dev.jna:jna` and `com.fasterxml.jackson.core:jackson-core`; alternatively, use the library JAR directly. Pure-only runtime use requires JDK 17 and no third-party runtime libraries. Pure success and error paths use no JNA, Jackson, JUnit, native code, WASM, subprocesses, network access, or fallback. Native backend use requires its dependencies; retain normal dependency resolution for it.
+
 >>>>> lang=ru
 ## Чисто-Java бэкенд
 
@@ -52,6 +54,8 @@ implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 ```
 
+В Maven исключите `net.java.dev.jna:jna` и `com.fasterxml.jackson.core:jackson-core`; альтернативно используйте JAR библиотеки напрямую. Для выполнения только чистого бэкенда нужен JDK 17, сторонние runtime-библиотеки не нужны. Успешные и ошибочные пути чистого бэкенда не используют JNA, Jackson, JUnit, нативный код, WASM, процессы, сеть или fallback. Нативному бэкенду нужны его зависимости; для него сохраняйте обычное разрешение зависимостей.
+
 >>>>> lang=zh
 ## 纯 Java 后端
 
@@ -78,4 +82,13 @@ Gradle 纯后端用法可关闭传递依赖：
 ```kotlin
 implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 ```
+
+Maven 请同时排除 `net.java.dev.jna:jna` 和 `com.fasterxml.jackson.core:jackson-core`；也可直接使用本库 JAR。纯后端运行需要 JDK 17，不需要第三方运行时库。纯后端的成功和错误路径均不使用 JNA、Jackson、JUnit、原生代码、WASM、子进程、网络或回退。原生后端用法需要其依赖；请为其保留常规依赖解析。
+该门面镜像 `Ktav` 的共享操作，并旨在生成相同的 `Value` 树和
+`KtavException` 信封；对于这些操作，代码可在两个后端之间无修改使用。
+源文本编辑包括替换、插入、删除和字面键重命名，支持文本路径和解码段。
+成功编辑保留未触及的源文本并验证预期树；不支持的源形式返回
+`EditUnsupported`。插入和重命名冲突返回 `EditAlreadyExists`。
+具体编辑契约见上文。没有全局后端
+开关：通过显式调用 `Ktav`（原生）或 `PureKtav`（纯）选择后端。
 

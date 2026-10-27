@@ -2,6 +2,7 @@ package lang.ktav.internal;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.LongByReference;
 import com.sun.jna.ptr.PointerByReference;
@@ -96,6 +97,74 @@ public interface NativeLib extends Library {
             PointerByReference outErr,
             LongByReference outErrLen);
 
+    int ktav_insert_value(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            Pointer replacement,
+            long replacementLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
+    int ktav_insert_value_segments(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            Pointer replacement,
+            long replacementLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
+    int ktav_remove_value(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
+    int ktav_remove_value_segments(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
+    int ktav_rename_key(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            Pointer newKey,
+            long newKeyLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
+    int ktav_rename_key_segments(
+            Pointer src,
+            long srcLen,
+            Pointer path,
+            long pathLen,
+            Pointer newKey,
+            long newKeyLen,
+            PointerByReference outBuf,
+            LongByReference outLen,
+            PointerByReference outErr,
+            LongByReference outErrLen);
+
     void ktav_free(Pointer ptr, long len);
 
     String ktav_version();
@@ -126,7 +195,27 @@ public interface NativeLib extends Library {
                                 + " (source-edit entry points need the 0.9"
                                 + " native library): " + path);
             }
+            NativeLibrary symbols = NativeLibrary.getInstance(path);
+            // Keep this handle open: the JNA proxy uses the same loaded library.
+            requireSymbol(symbols, "ktav_edit_value");
+            requireSymbol(symbols, "ktav_edit_value_segments");
+            requireSymbol(symbols, "ktav_insert_value");
+            requireSymbol(symbols, "ktav_insert_value_segments");
+            requireSymbol(symbols, "ktav_remove_value");
+            requireSymbol(symbols, "ktav_remove_value_segments");
+            requireSymbol(symbols, "ktav_rename_key");
+            requireSymbol(symbols, "ktav_rename_key_segments");
             return lib;
+        }
+
+        private static void requireSymbol(NativeLibrary library, String name) {
+            try {
+                library.getFunction(name);
+            } catch (UnsatisfiedLinkError e) {
+                throw new IllegalStateException(
+                        "ktav_cabi is missing required ABI-2 export "
+                                + name + ": " + library.getName(), e);
+            }
         }
 
         private Holder() {

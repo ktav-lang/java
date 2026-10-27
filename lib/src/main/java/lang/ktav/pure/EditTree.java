@@ -114,6 +114,7 @@ final class EditTree {
     private boolean rootConsumed;
     private Node rootInline;
     private boolean rootIsExplicit;
+    private int rootClose = -1;
 
     private EditTree(byte[] b) {
         this.b = b;
@@ -139,16 +140,18 @@ final class EditTree {
             lineStart = (b[pos] == '\r' && pos + 1 < n && b[pos + 1] == '\n')
                     ? pos + 2 : pos + 1;
         }
-        return new Result(t.finish(), t.rootIsExplicit);
+        return new Result(t.finish(), t.rootIsExplicit, t.rootClose);
     }
 
     static final class Result {
         final Node root;
         final boolean rootExplicit;
+        final int rootClose;
 
-        Result(Node root, boolean rootExplicit) {
+        Result(Node root, boolean rootExplicit, int rootClose) {
             this.root = root;
             this.rootExplicit = rootExplicit;
+            this.rootClose = rootClose;
         }
     }
 
@@ -412,6 +415,7 @@ final class EditTree {
 
     private void closeFrame(boolean object, int lineNum, int ts, int te) {
         if (stack.size() == 1 && rootIsExplicit) {
+            rootClose = ts;
             rootConsumed = true;
             return;
         }
@@ -534,7 +538,7 @@ final class EditTree {
     private Node positionInline(int from, int to, int depth) {
         boolean isObject = b[from] == '{';
         List<int[]> segments = new ArrayList<>();
-        splitTopLevel(from + 1, to - 1, isObject, segments);
+        splitTopLevelInternal(from + 1, to - 1, isObject, segments);
         if (isObject) {
             Node table = new Node(Node.OBJECT, true, null);
             for (int[] seg : segments) {
@@ -594,7 +598,14 @@ final class EditTree {
      * final segment. Input already parsed successfully — any surprise is
      * an internal error.
      */
-    private void splitTopLevel(int from, int to, boolean isObject,
+    static List<int[]> splitTopLevel(byte[] bytes, int from, int to, boolean isObject) {
+        EditTree tree = new EditTree(bytes);
+        List<int[]> segments = new ArrayList<>();
+        tree.splitTopLevelInternal(from, to, isObject, segments);
+        return segments;
+    }
+
+    private void splitTopLevelInternal(int from, int to, boolean isObject,
             List<int[]> out) {
         int i = from;
         int segAt = from;

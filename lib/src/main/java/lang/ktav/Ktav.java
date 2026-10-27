@@ -279,6 +279,170 @@ public final class Ktav {
                 true);
     }
 
+    /** Insert a value at a textual dotted path. The final segment is a new Object key. */
+    public static String insertValue(String src, String path, Value value) {
+        return sourceEdit(bytes(src, "src"), bytes(path, "path"), value, null,
+                "insert", false);
+    }
+
+    /** Byte-level variant of {@link #insertValue(String, String, Value)}. */
+    public static String insertValue(byte[] src, String path, Value value) {
+        return sourceEdit(src, bytes(path, "path"), value, null, "insert", false);
+    }
+
+    /** Insert a value using decoded literal path segments. */
+    public static String insertValueSegments(String src, List<String> segments,
+            Value value) {
+        return sourceEdit(bytes(src, "src"), WireJson.encodePath(segments),
+                value, null, "insert", true);
+    }
+
+    /** Byte-level variant of {@link #insertValueSegments(String, List, Value)}. */
+    public static String insertValueSegments(byte[] src, List<String> segments,
+            Value value) {
+        return sourceEdit(src, WireJson.encodePath(segments), value, null,
+                "insert", true);
+    }
+
+    /** Remove the value addressed by a textual dotted path. */
+    public static String removeValue(String src, String path) {
+        return sourceEdit(bytes(src, "src"), bytes(path, "path"), null, null,
+                "remove", false);
+    }
+
+    /** Byte-level variant of {@link #removeValue(String, String)}. */
+    public static String removeValue(byte[] src, String path) {
+        return sourceEdit(src, bytes(path, "path"), null, null, "remove", false);
+    }
+
+    /** Remove the value addressed by decoded literal path segments. */
+    public static String removeValueSegments(String src, List<String> segments) {
+        return sourceEdit(bytes(src, "src"), WireJson.encodePath(segments), null,
+                null, "remove", true);
+    }
+
+    /** Byte-level variant of {@link #removeValueSegments(String, List)}. */
+    public static String removeValueSegments(byte[] src, List<String> segments) {
+        return sourceEdit(src, WireJson.encodePath(segments), null, null,
+                "remove", true);
+    }
+
+    /** Rename the final addressed key; {@code newKey} is a literal decoded key. */
+    public static String renameKey(String src, String path, String newKey) {
+        return sourceEdit(bytes(src, "src"), bytes(path, "path"), null,
+                bytes(newKey, "newKey"), "rename", false);
+    }
+
+    /** Byte-level variant of {@link #renameKey(String, String, String)}. */
+    public static String renameKey(byte[] src, String path, String newKey) {
+        return sourceEdit(src, bytes(path, "path"), null, bytes(newKey, "newKey"),
+                "rename", false);
+    }
+
+    /** Rename the final addressed key using decoded literal path segments. */
+    public static String renameKeySegments(String src, List<String> segments,
+            String newKey) {
+        return sourceEdit(bytes(src, "src"), WireJson.encodePath(segments), null,
+                bytes(newKey, "newKey"), "rename", true);
+    }
+
+    /** Byte-level variant of {@link #renameKeySegments(String, List, String)}. */
+    public static String renameKeySegments(byte[] src, List<String> segments,
+            String newKey) {
+        return sourceEdit(src, WireJson.encodePath(segments), null,
+                bytes(newKey, "newKey"), "rename", true);
+    }
+
+    private static String sourceEdit(byte[] src, byte[] path, Value value,
+            byte[] newKey, String operation, boolean segments) {
+        if (src == null) {
+            throw new NullPointerException("src");
+        }
+        if (path == null) {
+            throw new NullPointerException("path");
+        }
+        if ("insert".equals(operation) && value == null) {
+            throw new NullPointerException("value");
+        }
+        if ("rename".equals(operation) && newKey == null) {
+            throw new NullPointerException("newKey");
+        }
+        byte[] payload = "insert".equals(operation) ? WireJson.encode(value) : null;
+        NativeLib lib = NativeLib.get();
+        try (Memory srcMem = new Memory(Math.max(1, src.length));
+                Memory pathMem = new Memory(Math.max(1, path.length));
+                Memory valueMem = payload == null ? null
+                        : new Memory(Math.max(1, payload.length));
+                Memory keyMem = newKey == null ? null
+                        : new Memory(Math.max(1, newKey.length))) {
+            if (src.length > 0) {
+                srcMem.write(0, src, 0, src.length);
+            }
+            if (path.length > 0) {
+                pathMem.write(0, path, 0, path.length);
+            }
+            if (payload != null && payload.length > 0) {
+                valueMem.write(0, payload, 0, payload.length);
+            }
+            if (newKey != null && newKey.length > 0) {
+                keyMem.write(0, newKey, 0, newKey.length);
+            }
+
+            PointerByReference outBuf = new PointerByReference();
+            LongByReference outLen = new LongByReference();
+            PointerByReference outErr = new PointerByReference();
+            LongByReference outErrLen = new LongByReference();
+            final int rc;
+            try {
+                if ("remove".equals(operation)) {
+                    rc = segments
+                            ? lib.ktav_remove_value_segments(srcMem, src.length,
+                                    pathMem, path.length, outBuf, outLen,
+                                    outErr, outErrLen)
+                            : lib.ktav_remove_value(srcMem, src.length, pathMem,
+                                    path.length, outBuf, outLen, outErr, outErrLen);
+                } else if ("rename".equals(operation)) {
+                    rc = segments
+                            ? lib.ktav_rename_key_segments(srcMem, src.length,
+                                    pathMem, path.length, keyMem, newKey.length,
+                                    outBuf, outLen, outErr, outErrLen)
+                            : lib.ktav_rename_key(srcMem, src.length, pathMem,
+                                    path.length, keyMem, newKey.length,
+                                    outBuf, outLen, outErr, outErrLen);
+                } else {
+                    rc = segments
+                            ? lib.ktav_insert_value_segments(srcMem, src.length,
+                                    pathMem, path.length, valueMem, payload.length,
+                                    outBuf, outLen, outErr, outErrLen)
+                            : lib.ktav_insert_value(srcMem, src.length, pathMem,
+                                    path.length, valueMem, payload.length,
+                                    outBuf, outLen, outErr, outErrLen);
+                }
+            } catch (LinkageError e) {
+                throw missingSourceEditSymbol(e);
+            }
+
+            if (rc != 0) {
+                byte[] error = copyAndFreeBytes(lib, outErr.getValue(),
+                        outErrLen.getValue());
+                if (error.length == 0) {
+                    throw new KtavException("native call failed with code " + rc);
+                }
+                throw KtavException.fromEnvelope(ErrorEnvelope.parse(error));
+            }
+            return new String(copyAndFreeBytes(lib, outBuf.getValue(),
+                    outLen.getValue()), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static KtavException missingSourceEditSymbol(LinkageError cause) {
+        return new KtavException(
+                "the loaded ktav_cabi native library does not provide the"
+                        + " source-mutation entry point; a library with the"
+                        + " required ABI-2 symbol is required",
+                cause);
+    }
+
     private static byte[] bytes(String s, String arg) {
         if (s == null) {
             throw new NullPointerException(arg);
@@ -413,12 +577,17 @@ public final class Ktav {
     }
 
     private static byte[] copyAndFreeBytes(NativeLib lib, Pointer ptr, long len) {
-        if (ptr == null || len <= 0) {
+        if (ptr == null) {
             return new byte[0];
         }
-        byte[] out = ptr.getByteArray(0, toIntLen(len));
-        lib.ktav_free(ptr, len);
-        return out;
+        try {
+            if (len <= 0) {
+                return new byte[0];
+            }
+            return ptr.getByteArray(0, toIntLen(len));
+        } finally {
+            lib.ktav_free(ptr, len);
+        }
     }
 
     private static int toIntLen(long len) {

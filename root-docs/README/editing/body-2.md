@@ -1,52 +1,74 @@
 >>>>> lang=en
-Paths are dotted (`key1.key2.0.key4`); inside a segment `\.` is a
-literal dot and `\\` a literal backslash. `editValueSegments` takes
-already-decoded literal segments instead — a numeric segment is a
-string key inside an object and a zero-based index inside an array.
-There is no create, remove, or rename: only replacement of an existing
-value.
+Both `Ktav` and standalone `PureKtav` provide `insertValue`,
+`removeValue`, and `renameKey`, plus their `*Segments` variants, with
+String and byte-array sources. Insertion creates only a new final key
+under an existing Object parent: no overwrite, implicit parents, or
+Array insertion. Removal deletes an existing value/subtree or Array
+element, shifts remaining elements, and never prunes empty ancestors.
+Renaming changes only the final Object key to a literal name, preserving
+value and order; the same name is a byte-identical no-op. Array indexes
+cannot be renamed. Replacement still changes only an existing value.
 
-Errors are structured: `EditInvalidPath` (body: the UTF-8 byte offset
-inside the path argument where the defect is), `EditNotFound` (missing
-key, out-of-bounds index, descent through a scalar, empty segments list), and
-`EditUnsupported` (body: the reason — e.g. a noncontiguous
-dotted-key/reopen target, a structural replacement that would drop
-interior comment lines, or a value without a lossless representation
-in the target context). Source-level problems still surface as the ordinary parse
-envelopes. The pure backend exposes the same operations as
-`PureKtav.editValue` / `PureKtav.editValueSegments` with identical
-output.
+Edits splice source ranges rather than serialize the whole document.
+Every success is reparsed and checked against the intended tree;
+untouched bytes, comments, BOM, EOL/EOF conventions, and key spelling
+remain unchanged. Inline layout expands only where needed for multiline
+values, growth beyond max(100 Unicode scalars, original line width), or
+String readability (at least four escapes and 25% overhead). Unsupported
+source shapes fail explicitly rather than returning corrupted text.
+
+Errors: `EditInvalidPath` (body: UTF-8 path byte offset), `EditNotFound`
+(missing target/parent, scalar descent, invalid Array index, empty decoded
+path), `EditAlreadyExists` (insert or rename collision), and
+`EditUnsupported` (body: reason, including noncontiguous dotted targets
+or removal of a compound containing comments). Source parse errors win
+over edit validation. Pure mode has no native dependency or fallback.
 
 >>>>> lang=ru
-Пути — через точку (`key1.key2.0.key4`); внутри сегмента `\.` —
-literal точка, `\\` — literal backslash. `editValueSegments` принимает
-уже декодированные literal-сегменты: числовой сегмент — это ключ
-внутри объекта и zero-based индекс внутри массива. Создание, удаление
-и переименование не поддерживаются — только замена существующего
-значения.
+`Ktav` и самостоятельный `PureKtav` предоставляют `insertValue`,
+`removeValue`, `renameKey` и варианты `*Segments` для String и byte[].
+Вставка создаёт только новый конечный ключ существующего Object:
+без перезаписи, неявных родителей или вставки в Array. Удаление убирает
+существующее значение/поддерево либо элемент Array, сдвигает оставшиеся
+элементы и не удаляет пустых предков. Переименование меняет только
+последний ключ Object на буквальное имя, сохраняя значение и порядок;
+прежнее имя даёт побайтовый no-op. Индексы Array не переименовываются.
+Замена по-прежнему изменяет только существующее значение.
 
-Ошибки структурированы: `EditInvalidPath` (body: UTF-8 byte offset
-внутри аргумента пути, где обнаружен дефект), `EditNotFound`
-(отсутствующий ключ, индекс вне диапазона, спуск через скаляр, пустой
-список сегментов) и `EditUnsupported` (body: причина — например noncontiguous-цель
-из dotted-ключей и reopen, структурная замена, которая потеряла бы
-комментарии внутри цели, или значение без lossless-представления в контексте цели).
-Проблемы самого исходника по-прежнему приходят обычными parse
-envelope'ами. Pure-бэкенд предоставляет те же операции —
-`PureKtav.editValue` / `PureKtav.editValueSegments` — с идентичным
-выводом.
+Правки выполняются сплайсом диапазонов, а не сериализацией документа.
+Каждый успешный результат повторно разбирается и сверяется с ожидаемым
+деревом; нетронутые байты, комментарии, BOM, EOL/EOF и написание ключей
+сохраняются. Inline-раскладка раскрывается лишь по необходимости:
+многострочное значение, рост сверх max(100 Unicode-скаляров, исходная
+ширина строки) либо читаемость String (не менее четырёх экранирований
+и 25% накладных расходов). Неподдерживаемая форма исходника даёт явный
+отказ, а не повреждённый текст.
+
+Ошибки: `EditInvalidPath` (body: UTF-8 byte offset пути), `EditNotFound`
+(нет цели/родителя, спуск через скаляр, неверный индекс Array, пустой
+декодированный путь), `EditAlreadyExists` (коллизия вставки/переименования)
+и `EditUnsupported` (body: причина, включая несмежную dotted-цель или
+удаление контейнера с комментариями). Ошибка разбора исходника имеет
+приоритет. Чистому режиму не нужны native-зависимости или fallback.
 
 >>>>> lang=zh
-路径以点分隔（`key1.key2.0.key4`）；段内 `\.` 表示字面点号，`\\`
-表示字面反斜杠。`editValueSegments` 直接接收已解码的字面段——数字段
-在对象中是字符串键，在数组中是从零开始的索引。不支持创建、删除或重
-命名——只支持替换已存在的值。
+`Ktav` 和独立的 `PureKtav` 均提供 `insertValue`、`removeValue`、
+`renameKey` 及 `*Segments` 变体，支持 String 和字节数组源文本。
+插入仅在已存在的 Object 父节点中创建新的末段键，不覆盖现有键，
+不隐式创建父节点，也不插入 Array。删除移除现有值、子树或 Array
+元素，后续元素前移，但不裁剪空祖先。重命名仅将末段 Object 键改为
+字面名称，保留值与顺序；名称不变时逐字节不变。不能重命名 Array
+索引。替换仍仅修改现有值。
 
-错误是结构化的：`EditInvalidPath`（body：路径参数中发现缺陷处的
-UTF-8 字节偏移）、`EditNotFound`（缺少键、索引越界、穿过标量下降、
-空路径段列表）和 `EditUnsupported`（body：原因——例如由 dotted 键与 reopen
-拼成的非连续目标、会丢失容器内部注释的结构性替换，或无法在目标上下文中
-无损表示的值）。源文本本身的问题仍以普通解析错误 envelope 报告。
-纯 Java 后端提供相同操作——`PureKtav.editValue` /
-`PureKtav.editValueSegments`，输出完全一致。
+编辑拼接源文本范围，不重新序列化整个文档。每个成功结果都会重新
+解析并核对预期树；未触及的字节、注释、BOM、EOL/EOF 约定和键拼写
+保持不变。仅在多行值、增长超过 max(100 个 Unicode 标量，原行宽)
+或 String 可读性需要时展开 inline 布局；可读性阈值为至少四个转义
+且开销至少 25%。不支持的源文本形式会明确失败，不返回损坏文本。
+
+错误包括 `EditInvalidPath`（body：路径的 UTF-8 字节偏移）、
+`EditNotFound`（目标或父节点不存在、穿过标量、无效 Array 索引、
+空解码路径）、`EditAlreadyExists`（插入或重命名冲突）和
+`EditUnsupported`（body：原因，包括不连续 dotted 目标或删除含注释
+的容器）。源文本解析错误优先。纯模式不依赖原生库，也不会回退。
 

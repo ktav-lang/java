@@ -200,22 +200,34 @@ equal to the current value is a byte-identical no-op, even for
 noncanonical scalar spellings.
 
 Paths are dotted (`key1.key2.0.key4`); inside a segment `\.` is a
-literal dot and `\\` a literal backslash. `editValueSegments` takes
-already-decoded literal segments instead — a numeric segment is a
-string key inside an object and a zero-based index inside an array.
-There is no create, remove, or rename: only replacement of an existing
-value.
+literal dot and `\\` a literal backslash. The `*Segments` variants take
+already-decoded literal segments: numeric segments are Object keys or
+zero-based Array indexes, depending on the parent.
 
-Errors are structured: `EditInvalidPath` (body: the UTF-8 byte offset
-inside the path argument where the defect is), `EditNotFound` (missing
-key, out-of-bounds index, descent through a scalar, empty segments list), and
-`EditUnsupported` (body: the reason — e.g. a noncontiguous
-dotted-key/reopen target, a structural replacement that would drop
-interior comment lines, or a value without a lossless representation
-in the target context). Source-level problems still surface as the ordinary parse
-envelopes. The pure backend exposes the same operations as
-`PureKtav.editValue` / `PureKtav.editValueSegments` with identical
-output.
+Both `Ktav` and standalone `PureKtav` provide `insertValue`,
+`removeValue`, and `renameKey`, plus their `*Segments` variants, with
+String and byte-array sources. Insertion creates only a new final key
+under an existing Object parent: no overwrite, implicit parents, or
+Array insertion. Removal deletes an existing value/subtree or Array
+element, shifts remaining elements, and never prunes empty ancestors.
+Renaming changes only the final Object key to a literal name, preserving
+value and order; the same name is a byte-identical no-op. Array indexes
+cannot be renamed. Replacement still changes only an existing value.
+
+Edits splice source ranges rather than serialize the whole document.
+Every success is reparsed and checked against the intended tree;
+untouched bytes, comments, BOM, EOL/EOF conventions, and key spelling
+remain unchanged. Inline layout expands only where needed for multiline
+values, growth beyond max(100 Unicode scalars, original line width), or
+String readability (at least four escapes and 25% overhead). Unsupported
+source shapes fail explicitly rather than returning corrupted text.
+
+Errors: `EditInvalidPath` (body: UTF-8 path byte offset), `EditNotFound`
+(missing target/parent, scalar descent, invalid Array index, empty decoded
+path), `EditAlreadyExists` (insert or rename collision), and
+`EditUnsupported` (body: reason, including noncontiguous dotted targets
+or removal of a compound containing comments). Source parse errors win
+over edit validation. Pure mode has no native dependency or fallback.
 
 ### Source-edit cookbook
 
@@ -483,9 +495,15 @@ implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 
 For Maven, exclude both `net.java.dev.jna:jna` and `com.fasterxml.jackson.core:jackson-core`; alternatively, use the library JAR directly. Pure-only runtime use requires JDK 17 and no third-party runtime libraries. Pure success and error paths use no JNA, Jackson, JUnit, native code, WASM, subprocesses, network access, or fallback. Native backend use requires its dependencies; retain normal dependency resolution for it.
 
-The facade mirrors `Ktav` operation-for-operation and is designed to
+The facade mirrors the shared operations of `Ktav` and is designed to
 produce the same `Value` tree and the same `KtavException` envelopes,
-so code written against one backend reads unchanged against the other. There is no
+so code written against one backend reads unchanged against the other
+for those operations. Source editing includes replacement, insertion,
+removal, and literal-key renaming, with textual and decoded-segment paths.
+Successful edits preserve untouched source and verify the intended tree;
+unsupported source shapes fail with `EditUnsupported`. Insert and rename
+collisions report `EditAlreadyExists`. See the source-edit contract above.
+There is no
 global backend switch: you choose a backend explicitly by calling
 `Ktav` (native) or `PureKtav` (pure).
 

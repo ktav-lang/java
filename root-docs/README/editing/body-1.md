@@ -23,6 +23,11 @@ branch expands — untouched nested branches stay inline. A replacement
 equal to the current value is a byte-identical no-op, even for
 noncanonical scalar spellings.
 
+Paths are dotted (`key1.key2.0.key4`); inside a segment `\.` is a
+literal dot and `\\` a literal backslash. The `*Segments` variants take
+already-decoded literal segments: numeric segments are Object keys or
+zero-based Array indexes, depending on the parent.
+
 >>>>> lang=ru
 ### Правка исходного текста
 
@@ -48,6 +53,11 @@ String out = Ktav.editValue("port: 8080\nhost: db\n", "port",
 равная текущему значению, — byte-identical no-op даже для
 неканонических написаний скаляров.
 
+Пути разделены точками (`key1.key2.0.key4`); внутри сегмента `\.` —
+буквальная точка, `\\` — обратная косая черта. Варианты `*Segments`
+принимают декодированные буквальные сегменты: числовой сегмент — ключ
+Object либо индекс Array с нуля в зависимости от родителя.
+
 >>>>> lang=zh
 ### 编辑源文本
 
@@ -68,4 +78,8 @@ String out = Ktav.editValue("port: 8080\nhost: db\n", "port",
 inline 包装才会展开，且只展开受影响的分支——未触及的嵌套分支保持
 inline。与当前值相等的替换是字节完全一致的 no-op，即使标量拼写不
 规范也一样。
+
+路径以点分隔（`key1.key2.0.key4`）；段内 `\.` 表示字面点号，
+`\\` 表示字面反斜杠。`*Segments` 接收已解码的字面段；数字段按父节点
+类型解释为 Object 键或从零开始的 Array 索引。
 

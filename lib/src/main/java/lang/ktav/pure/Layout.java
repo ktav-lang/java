@@ -80,7 +80,7 @@ final class Layout {
                     && (source[start + 2] & 0xFF) == 0xBF) {
                 start += 3;
             }
-            return new long[] { start, t[1] };
+            return new long[] { Bytes.skipWs(source, start, t[1]), t[1] };
         }
         for (String segment : path) {
             if (node.kind == EditTree.Node.OBJECT) {

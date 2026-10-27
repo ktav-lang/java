@@ -23,6 +23,8 @@ itself — for the latter see
 
 ## Unreleased
 
+- Add pure-backend `insertValue` / `insertValueSegments`, `removeValue` / `removeValueSegments`, and `renameKey` / `renameKeySegments`, matching the native source-edit APIs. Insert requires an existing Object parent; remove retains empty ancestors; rename preserves value and order. Successful splices verify the intended tree, and unsafe source shapes fail with `EditUnsupported`. Insert/rename collisions report `EditAlreadyExists`. These APIs prepare 0.9; package versions are unchanged.
+
 ## 0.8.1 — 2026-10-22
 
 ### Added
