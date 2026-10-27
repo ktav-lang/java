@@ -31,6 +31,14 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+val sourceEditBenchmark by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs the opt-in native/pure source edit benchmark."
+    dependsOn(tasks.named("compileTestJava"))
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("lang.ktav.SourceEditBenchmark")
+}
+
 val pureCheckJar by tasks.registering(Jar::class) {
     group = "verification"
     description = "Packages the compiled pure smoke checker."

@@ -260,6 +260,58 @@ jobs:
           path: lib/build/publications/maven/
           retention-days: 14
 
+  source-edit-benchmark:
+    name: source edit benchmark (native + pure)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build native library
+        run: cargo build --release -p ktav-cabi
+
+      - name: Run source edit benchmark
+        shell: bash
+        env:
+          KTAV_LIB_PATH: ${{ github.workspace }}/target/release/libktav_cabi.so
+        run: |
+          set -euo pipefail
+          {
+            echo "github_sha=${GITHUB_SHA}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "ref=${GITHUB_REF}"
+            echo "workflow=${GITHUB_WORKFLOW}"
+            rustc --version
+            cargo --version
+            java -version
+            ./gradlew :lib:sourceEditBenchmark --no-daemon --stacktrace
+          } 2>&1 | tee source-edit-benchmark.log
+
+      - name: Upload benchmark measurements and output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-edit-benchmark
+          path: source-edit-benchmark.log
+          if-no-files-found: warn
+          retention-days: 14
+
   # ------------------------------------------------------------------
   # DEBUG-cabi empty-input ABI check. Rust debug builds assert slice
   # pointer validity, so a Pointer.NULL empty source fails here while
