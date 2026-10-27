@@ -237,7 +237,7 @@ public final class PureKtav {
 
     private static String applyInsert(Validated v, List<String> segments, Value replacement) {
         try {
-            return EditSplice.insert(v.b, v.start, segments, replacement);
+            return EditSplice.insert(v.b, v.start, v.value, segments, replacement);
         } catch (EditError e) {
             throw editFailure(envelopeFor(e));
         } catch (SourceError e) {
@@ -276,7 +276,7 @@ public final class PureKtav {
     }
 
     private static String applyRemove(Validated v, List<String> segments) {
-        try { return RemoveSplice.apply(v.b, v.start, segments); }
+        try { return RemoveSplice.apply(v.b, v.start, v.value, segments); }
         catch (EditError e) { throw editFailure(envelopeFor(e)); }
         catch (SourceError e) { throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
                 e.reason, e.line, e.lineText, e.spanStart, e.spanEnd, e.path,
@@ -310,7 +310,7 @@ public final class PureKtav {
     }
 
     private static String applyRename(Validated v, List<String> segments, String newKey) {
-        try { return RenameSplice.apply(v.b, v.start, segments, newKey); }
+        try { return RenameSplice.apply(v.b, v.start, v.value, segments, newKey); }
         catch (EditError e) { throw editFailure(envelopeFor(e)); }
         catch (SourceError e) { throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
                 e.reason, e.line, e.lineText, e.spanStart, e.spanEnd, e.path,
@@ -400,8 +400,8 @@ public final class PureKtav {
     private static Validated parseSourceFirst(byte[] src) {
         try {
             Validated v = validated(src);
-            PureParser.parse(v.b, v.start, false);
-            return v;
+            Value parsed = PureParser.parse(v.b, v.start, false);
+            return new Validated(v.b, v.start, parsed);
         } catch (SourceError e) {
             throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
                     e.reason, e.line, e.lineText, e.spanStart, e.spanEnd,
@@ -552,10 +552,16 @@ public final class PureKtav {
     private static final class Validated {
         final byte[] b;
         final int start;
+        final Value value;
 
         Validated(byte[] b, int start) {
+            this(b, start, null);
+        }
+
+        Validated(byte[] b, int start, Value value) {
             this.b = b;
             this.start = start;
+            this.value = value;
         }
     }
 

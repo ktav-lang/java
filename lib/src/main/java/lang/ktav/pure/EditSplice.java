@@ -24,9 +24,8 @@ final class EditSplice {
 
     // ── Public entry ────────────────────────────────────────────────────
 
-    static String insert(byte[] b, int bomStart, List<String> segments, Value replacement) {
+    static String insert(byte[] b, int bomStart, Value original, List<String> segments, Value replacement) {
         if (segments.isEmpty()) throw EditError.notFound();
-        Value original = PureParser.parse(b, bomStart, false);
         List<String> parentPath = segments.subList(0, segments.size() - 1);
         String key = segments.get(segments.size() - 1);
         Value parent = lookupValue(original, parentPath);

@@ -11,8 +11,7 @@ import lang.ktav.Value;
 final class RenameSplice {
     private RenameSplice() { }
 
-    static String apply(byte[] source, int bomStart, List<String> segments, String newKey) {
-        Value original = PureParser.parse(source, bomStart, false);
+    static String apply(byte[] source, int bomStart, Value original, List<String> segments, String newKey) {
         if (segments.isEmpty()) throw EditError.notFound();
         if (newKey.isEmpty()) throw EditError.unsupported("empty key name is not representable");
         String oldKey = segments.get(segments.size() - 1);
