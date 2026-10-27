@@ -82,7 +82,7 @@ jobs:
           with open('Cargo.lock', 'rb') as source:
               packages = tomllib.load(source)['package']
           core = [package for package in packages if package['name'] == 'ktav']
-          expected_source = 'git+https://github.com/ktav-lang/rust?rev=861c64a8378242b87b66b7d7bfeb119996ce3643#861c64a8378242b87b66b7d7bfeb119996ce3643'
+          expected_source = 'git+https://github.com/ktav-lang/rust?rev=8b6b45ffbd9e50e1588e8ab6b1ae5d422bbe8910#8b6b45ffbd9e50e1588e8ab6b1ae5d422bbe8910'
           if len(core) != 1 or core[0].get('source') != expected_source:
               raise SystemExit(f'expected exactly one ktav from pinned git revision; found {core!r}')
           print('generated lockfile resolves ktav from the pinned core revision')
@@ -186,6 +186,8 @@ jobs:
           --tests "lang.ktav.PureNoNativeTest"
           --tests "lang.ktav.CorpusGuardMutationTest"
           --tests "lang.ktav.PureWhitespaceTest"
+          --tests "lang.ktav.PureInsertValueTest"
+          --tests "lang.ktav.PureRemoveRenameTest"
 
       - name: Upload test reports
         if: failure()
@@ -299,7 +301,7 @@ jobs:
           with open('Cargo.lock', 'rb') as source:
               packages = tomllib.load(source)['package']
           core = [package for package in packages if package['name'] == 'ktav']
-          expected_source = 'git+https://github.com/ktav-lang/rust?rev=861c64a8378242b87b66b7d7bfeb119996ce3643#861c64a8378242b87b66b7d7bfeb119996ce3643'
+          expected_source = 'git+https://github.com/ktav-lang/rust?rev=8b6b45ffbd9e50e1588e8ab6b1ae5d422bbe8910#8b6b45ffbd9e50e1588e8ab6b1ae5d422bbe8910'
           if len(core) != 1 or core[0].get('source') != expected_source:
               raise SystemExit(f'expected exactly one ktav from pinned git revision; found {core!r}')
           print('generated lockfile resolves ktav from the pinned core revision')

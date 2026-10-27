@@ -21,6 +21,7 @@ final class EditError extends RuntimeException {
     enum Code {
         INVALID_PATH,
         NOT_FOUND,
+        ALREADY_EXISTS,
         UNSUPPORTED
     }
 
@@ -46,6 +47,11 @@ final class EditError extends RuntimeException {
     static EditError notFound() {
         return new EditError(Code.NOT_FOUND, -1, null,
                 "edit path does not address an existing value");
+    }
+
+    static EditError alreadyExists() {
+        return new EditError(Code.ALREADY_EXISTS, -1, null,
+                "Object key already exists");
     }
 
     static EditError unsupported(String reason) {

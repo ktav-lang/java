@@ -1,9 +1,13 @@
 >>>>> lang=en
-For Maven, exclude both `net.java.dev.jna:jna` and `com.fasterxml.jackson.core:jackson-core`; alternatively, use the library JAR directly. Pure-only runtime use requires JDK 17 and no third-party runtime libraries. Pure success and error paths use no JNA, Jackson, JUnit, native code, WASM, subprocesses, network access, or fallback. Native backend use requires its dependencies; retain normal dependency resolution for it.
-
-The facade mirrors `Ktav` operation-for-operation and is designed to
+The facade mirrors the shared operations of `Ktav` and is designed to
 produce the same `Value` tree and the same `KtavException` envelopes,
-so code written against one backend reads unchanged against the other. There is no
+so code written against one backend reads unchanged against the other
+for those operations. Source editing includes replacement, insertion,
+removal, and literal-key renaming, with textual and decoded-segment paths.
+Successful edits preserve untouched source and verify the intended tree;
+unsupported source shapes fail with `EditUnsupported`. Insert and rename
+collisions report `EditAlreadyExists`. See the source-edit contract above.
+There is no
 global backend switch: you choose a backend explicitly by calling
 `Ktav` (native) or `PureKtav` (pure).
 
@@ -24,14 +28,16 @@ reference writer's documented layout (4-space indent, insertion order,
 § 5.9.10 key form selection).
 
 >>>>> lang=ru
-В Maven исключите `net.java.dev.jna:jna` и `com.fasterxml.jackson.core:jackson-core`; альтернативно используйте JAR библиотеки напрямую. Для выполнения только чистого бэкенда нужен JDK 17, сторонние runtime-библиотеки не нужны. Успешные и ошибочные пути чистого бэкенда не используют JNA, Jackson, JUnit, нативный код, WASM, процессы, сеть или fallback. Нативному бэкенду нужны его зависимости; для него сохраняйте обычное разрешение зависимостей.
-
-Фасад повторяет `Ktav` операция в операцию и спроектирован так, чтобы
-давать то же дерево `Value` и те же конверты `KtavException`, поэтому
-код, написанный против одного бэкенда, против другого читается без
-изменений. Глобального
-переключателя бэкендов нет: бэкенд выбирается явно — вызовом `Ktav`
-(нативный) или `PureKtav` (чистый).
+Фасад повторяет общие операции `Ktav` и спроектирован так, чтобы
+давать то же дерево `Value` и те же конверты `KtavException`; для этих
+операций код можно переносить между бэкендами без изменений. Редактирование
+включает замену, вставку, удаление и переименование буквального ключа,
+с текстовыми путями и декодированными сегментами. Успех сохраняет нетронутый
+исходник и проверяет ожидаемое дерево; неподдерживаемая форма даёт
+`EditUnsupported`. Коллизии вставки и переименования — `EditAlreadyExists`.
+Контракт редактирования описан выше. Глобального переключателя
+бэкендов нет: бэкенд выбирается явно — вызовом `Ktav` (нативный) или
+`PureKtav` (чистый).
 
 Чистый режим никогда не загружает и не скачивает нативную библиотеку —
 ни JNA, ни `ktav_cabi`, ни кэш-каталога, ни сети. Это правильный выбор
@@ -50,12 +56,6 @@ reference writer's documented layout (4-space indent, insertion order,
 порядок вставки, выбор формы ключей по § 5.9.10).
 
 >>>>> lang=zh
-Maven 请同时排除 `net.java.dev.jna:jna` 和 `com.fasterxml.jackson.core:jackson-core`；也可直接使用本库 JAR。纯后端运行需要 JDK 17，不需要第三方运行时库。纯后端的成功和错误路径均不使用 JNA、Jackson、JUnit、原生代码、WASM、子进程、网络或回退。原生后端用法需要其依赖；请为其保留常规依赖解析。
-该门面逐操作镜像 `Ktav`，其设计目标是产出相同的 `Value` 树和相同的
-`KtavException` 信封，因此针对一个后端编写的代码，换到另一个后端
-无需改动。没有全局后端开关：后端通过显式调用选择 —— `Ktav`
-（原生）或 `PureKtav`（纯）。
-
 纯模式从不加载或下载原生库 —— 没有 JNA、没有 `ktav_cabi`、没有缓存
 目录、没有网络。它适合离线（air-gapped）环境、没有预编译原生资产的
 平台，以及任何在乎纯 JVM 依赖的场景。原生后端仍是按参考实现调优的

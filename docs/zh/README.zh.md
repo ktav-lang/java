@@ -190,18 +190,29 @@ inline 包装才会展开，且只展开受影响的分支——未触及的嵌�
 inline。与当前值相等的替换是字节完全一致的 no-op，即使标量拼写不
 规范也一样。
 
-路径以点分隔（`key1.key2.0.key4`）；段内 `\.` 表示字面点号，`\\`
-表示字面反斜杠。`editValueSegments` 直接接收已解码的字面段——数字段
-在对象中是字符串键，在数组中是从零开始的索引。不支持创建、删除或重
-命名——只支持替换已存在的值。
+路径以点分隔（`key1.key2.0.key4`）；段内 `\.` 表示字面点号，
+`\\` 表示字面反斜杠。`*Segments` 接收已解码的字面段；数字段按父节点
+类型解释为 Object 键或从零开始的 Array 索引。
 
-错误是结构化的：`EditInvalidPath`（body：路径参数中发现缺陷处的
-UTF-8 字节偏移）、`EditNotFound`（缺少键、索引越界、穿过标量下降、
-空路径段列表）和 `EditUnsupported`（body：原因——例如由 dotted 键与 reopen
-拼成的非连续目标、会丢失容器内部注释的结构性替换，或无法在目标上下文中
-无损表示的值）。源文本本身的问题仍以普通解析错误 envelope 报告。
-纯 Java 后端提供相同操作——`PureKtav.editValue` /
-`PureKtav.editValueSegments`，输出完全一致。
+`Ktav` 和独立的 `PureKtav` 均提供 `insertValue`、`removeValue`、
+`renameKey` 及 `*Segments` 变体，支持 String 和字节数组源文本。
+插入仅在已存在的 Object 父节点中创建新的末段键，不覆盖现有键，
+不隐式创建父节点，也不插入 Array。删除移除现有值、子树或 Array
+元素，后续元素前移，但不裁剪空祖先。重命名仅将末段 Object 键改为
+字面名称，保留值与顺序；名称不变时逐字节不变。不能重命名 Array
+索引。替换仍仅修改现有值。
+
+编辑拼接源文本范围，不重新序列化整个文档。每个成功结果都会重新
+解析并核对预期树；未触及的字节、注释、BOM、EOL/EOF 约定和键拼写
+保持不变。仅在多行值、增长超过 max(100 个 Unicode 标量，原行宽)
+或 String 可读性需要时展开 inline 布局；可读性阈值为至少四个转义
+且开销至少 25%。不支持的源文本形式会明确失败，不返回损坏文本。
+
+错误包括 `EditInvalidPath`（body：路径的 UTF-8 字节偏移）、
+`EditNotFound`（目标或父节点不存在、穿过标量、无效 Array 索引、
+空解码路径）、`EditAlreadyExists`（插入或重命名冲突）和
+`EditUnsupported`（body：原因，包括不连续 dotted 目标或删除含注释
+的容器）。源文本解析错误优先。纯模式不依赖原生库，也不会回退。
 
 ### 源文本编辑示例
 
@@ -463,10 +474,13 @@ implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 ```
 
 Maven 请同时排除 `net.java.dev.jna:jna` 和 `com.fasterxml.jackson.core:jackson-core`；也可直接使用本库 JAR。纯后端运行需要 JDK 17，不需要第三方运行时库。纯后端的成功和错误路径均不使用 JNA、Jackson、JUnit、原生代码、WASM、子进程、网络或回退。原生后端用法需要其依赖；请为其保留常规依赖解析。
-该门面逐操作镜像 `Ktav`，其设计目标是产出相同的 `Value` 树和相同的
-`KtavException` 信封，因此针对一个后端编写的代码，换到另一个后端
-无需改动。没有全局后端开关：后端通过显式调用选择 —— `Ktav`
-（原生）或 `PureKtav`（纯）。
+该门面镜像 `Ktav` 的共享操作，并旨在生成相同的 `Value` 树和
+`KtavException` 信封；对于这些操作，代码可在两个后端之间无修改使用。
+源文本编辑包括替换、插入、删除和字面键重命名，支持文本路径和解码段。
+成功编辑保留未触及的源文本并验证预期树；不支持的源形式返回
+`EditUnsupported`。插入和重命名冲突返回 `EditAlreadyExists`。
+具体编辑契约见上文。没有全局后端
+开关：通过显式调用 `Ktav`（原生）或 `PureKtav`（纯）选择后端。
 
 纯模式从不加载或下载原生库 —— 没有 JNA、没有 `ktav_cabi`、没有缓存
 目录、没有网络。它适合离线（air-gapped）环境、没有预编译原生资产的

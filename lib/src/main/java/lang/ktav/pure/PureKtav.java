@@ -193,6 +193,130 @@ public final class PureKtav {
     // Lossless source edits (spec 0.9)
     // ------------------------------------------------------------------
 
+    // ------------------------------------------------------------------
+    // Object insertion
+    // ------------------------------------------------------------------
+
+    /** Insert a value at a textual dotted path; the final segment must be a new Object key. */
+    public static String insertValue(String src, String path, Value value) {
+        return insertValue(encoded(src), path, value);
+    }
+
+    /** Byte-level variant; validates and parses source before path/value errors. */
+    public static String insertValue(byte[] src, String path, Value value) {
+        if (src == null) throw new NullPointerException("src");
+        if (value == null) throw new NullPointerException("value");
+        Validated v = parseSourceFirst(src);
+        Value replacement = canonicalizeWire(value);
+        List<String> segments;
+        try {
+            segments = EditPath.parse(pathBytes(path));
+        } catch (EditError e) {
+            throw editFailure(envelopeFor(e));
+        }
+        return applyInsert(v, segments, replacement);
+    }
+
+    /** Insert using pre-decoded literal path segments. */
+    public static String insertValueSegments(String src, List<String> segments, Value value) {
+        return insertValueSegments(encoded(src), segments, value);
+    }
+
+    /** Byte-level variant of {@link #insertValueSegments(String, List, Value)}. */
+    public static String insertValueSegments(byte[] src, List<String> segments, Value value) {
+        if (src == null) throw new NullPointerException("src");
+        if (segments == null) throw new NullPointerException("segments");
+        if (value == null) throw new NullPointerException("value");
+        Validated v = parseSourceFirst(src);
+        Value replacement = canonicalizeWire(value);
+        if (segments.isEmpty()) throw editFailure(ErrorEnvelope.of(
+                "EditNotFound", null, null, null, null, null, null, null, null, null,
+                "edit path does not address an Object member"));
+        return applyInsert(v, segments, replacement);
+    }
+
+    private static String applyInsert(Validated v, List<String> segments, Value replacement) {
+        try {
+            return EditSplice.insert(v.b, v.start, segments, replacement);
+        } catch (EditError e) {
+            throw editFailure(envelopeFor(e));
+        } catch (SourceError e) {
+            throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error, e.reason, e.line,
+                    e.lineText, e.spanStart, e.spanEnd, e.path, e.body, e.canonical,
+                    e.specSection, e.getMessage()));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Object removal and key rename
+    // ------------------------------------------------------------------
+
+    public static String removeValue(String src, String path) {
+        return removeValue(encoded(src), path);
+    }
+
+    public static String removeValue(byte[] src, String path) {
+        if (src == null) throw new NullPointerException("src");
+        Validated v = parseSourceFirst(src);
+        List<String> segments;
+        try { segments = EditPath.parse(pathBytes(path)); }
+        catch (EditError e) { throw editFailure(envelopeFor(e)); }
+        return applyRemove(v, segments);
+    }
+
+    public static String removeValueSegments(String src, List<String> segments) {
+        return removeValueSegments(encoded(src), segments);
+    }
+
+    public static String removeValueSegments(byte[] src, List<String> segments) {
+        if (src == null) throw new NullPointerException("src");
+        if (segments == null) throw new NullPointerException("segments");
+        Validated v = parseSourceFirst(src);
+        return applyRemove(v, segments);
+    }
+
+    private static String applyRemove(Validated v, List<String> segments) {
+        try { return RemoveSplice.apply(v.b, v.start, segments); }
+        catch (EditError e) { throw editFailure(envelopeFor(e)); }
+        catch (SourceError e) { throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
+                e.reason, e.line, e.lineText, e.spanStart, e.spanEnd, e.path,
+                e.body, e.canonical, e.specSection, e.getMessage())); }
+    }
+
+    public static String renameKey(String src, String path, String newKey) {
+        return renameKey(encoded(src), path, newKey);
+    }
+
+    public static String renameKey(byte[] src, String path, String newKey) {
+        if (src == null) throw new NullPointerException("src");
+        if (newKey == null) throw new NullPointerException("newKey");
+        Validated v = parseSourceFirst(src);
+        List<String> segments;
+        try { segments = EditPath.parse(pathBytes(path)); }
+        catch (EditError e) { throw editFailure(envelopeFor(e)); }
+        return applyRename(v, segments, newKey);
+    }
+
+    public static String renameKeySegments(String src, List<String> segments, String newKey) {
+        return renameKeySegments(encoded(src), segments, newKey);
+    }
+
+    public static String renameKeySegments(byte[] src, List<String> segments, String newKey) {
+        if (src == null) throw new NullPointerException("src");
+        if (segments == null) throw new NullPointerException("segments");
+        if (newKey == null) throw new NullPointerException("newKey");
+        Validated v = parseSourceFirst(src);
+        return applyRename(v, segments, newKey);
+    }
+
+    private static String applyRename(Validated v, List<String> segments, String newKey) {
+        try { return RenameSplice.apply(v.b, v.start, segments, newKey); }
+        catch (EditError e) { throw editFailure(envelopeFor(e)); }
+        catch (SourceError e) { throw KtavException.fromEnvelope(ErrorEnvelope.of(e.error,
+                e.reason, e.line, e.lineText, e.spanStart, e.spanEnd, e.path,
+                e.body, e.canonical, e.specSection, e.getMessage())); }
+    }
+
     /**
      * Replace an existing value addressed by the textual dotted path
      * ({@code key1.key2.0.key4}; {@code \.} is a literal dot, {@code \\}
@@ -402,6 +526,9 @@ public final class PureKtav {
                     String.valueOf(e.offset), null, null, e.getMessage());
             case NOT_FOUND -> ErrorEnvelope.of(
                     "EditNotFound", null, null, null, null, null, null,
+                    null, null, null, e.getMessage());
+            case ALREADY_EXISTS -> ErrorEnvelope.of(
+                    "EditAlreadyExists", null, null, null, null, null, null,
                     null, null, null, e.getMessage());
             case UNSUPPORTED -> ErrorEnvelope.of(
                     "EditUnsupported", null, null, null, null, null, null,

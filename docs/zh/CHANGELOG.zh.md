@@ -22,6 +22,8 @@ MINOR 递增视为破坏性变更。
 
 ## Unreleased
 
+- 新增纯后端 `insertValue` / `insertValueSegments`、`removeValue` / `removeValueSegments` 和 `renameKey` / `renameKeySegments`，对应原生源文本编辑 API。插入要求已存在的 Object 父节点，删除保留空祖先，重命名保留值和顺序。成功拼接验证预期树，无法安全处理的源形式返回 `EditUnsupported`；插入或重命名冲突返回 `EditAlreadyExists`。这些 API 为 0.9 做准备，包版本不变。
+
 ## 0.8.1 — 2026-10-22
 
 ### 新增

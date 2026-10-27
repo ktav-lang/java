@@ -24,6 +24,274 @@ final class EditSplice {
 
     // ── Public entry ────────────────────────────────────────────────────
 
+    static String insert(byte[] b, int bomStart, List<String> segments, Value replacement) {
+        if (segments.isEmpty()) throw EditError.notFound();
+        Value original = PureParser.parse(b, bomStart, false);
+        List<String> parentPath = segments.subList(0, segments.size() - 1);
+        String key = segments.get(segments.size() - 1);
+        Value parent = lookupValue(original, parentPath);
+        if (parent instanceof Value.Arr) throw EditError.unsupported(
+                "insertion into an Array is not supported; only Object members can be created");
+        if (!(parent instanceof Value.Obj object)) throw EditError.notFound();
+        if (object.entries().containsKey(key)) throw EditError.alreadyExists();
+
+        EditTree.Result tree = EditTree.build(b);
+        Descend parentLoc = parentPath.isEmpty()
+                ? new Descend(tree.root, tree.root.inline, false)
+                : descend(tree.root, parentPath, tree.rootExplicit);
+        if (parentLoc.node.slot == null && !parentPath.isEmpty())
+            throw EditError.unsupported("parent is a noncontiguous value (dotted-key/reopen intermediate); no lossless insertion point exists");
+        EditTree.Node node = parentLoc.node;
+        if (node.kind != EditTree.Node.OBJECT) throw EditError.notFound();
+        String result;
+        int layoutFrom = -1;
+        int layoutTo = -1;
+        int layoutInserted = 0;
+        boolean layoutEligible = false;
+
+        boolean owningInlineBody = node.slot != null
+                && (node.slot.kind == EditTree.Slot.PAIR || node.slot.kind == EditTree.Slot.ITEM)
+                && isInlineBody(b, node.slot.b0, node.slot.b1);
+        if (node.inline || owningInlineBody) {
+            int[] trimmed;
+            if (node.slot != null) {
+                trimmed = Bytes.trim(b, node.slot.b0, node.slot.b1);
+            } else if (parentPath.isEmpty()) {
+                int lineStart = bomStart;
+                int contentStart = -1;
+                while (lineStart < b.length) {
+                    int lineEnd = lineStart;
+                    while (lineEnd < b.length && b[lineEnd] != '\n' && b[lineEnd] != '\r') lineEnd++;
+                    int[] content = Bytes.trim(b, lineStart, lineEnd);
+                    if (content[0] < content[1] && !(content[1] - content[0] >= 2
+                            && b[content[0]] == '#' && b[content[0] + 1] == '#')) {
+                        contentStart = content[0];
+                        break;
+                    }
+                    lineStart = lineEnd;
+                    while (lineStart < b.length && (b[lineStart] == '\n' || b[lineStart] == '\r')) lineStart++;
+                }
+                if (contentStart < 0) throw EditError.unsupported("inline Object has no lossless insertion range");
+                int lineEnd = contentStart;
+                while (lineEnd < b.length && b[lineEnd] != '\n' && b[lineEnd] != '\r') lineEnd++;
+                trimmed = Bytes.trim(b, contentStart, lineEnd);
+            } else {
+                throw EditError.unsupported("inline Object has no lossless insertion range");
+            }
+            int end = trimmed[1];
+            if (end <= trimmed[0] || b[trimmed[0]] != '{' || b[end - 1] != '}')
+                throw EditError.unsupported("inline Object has no lossless insertion range");
+            String existingInline = Bytes.text(b, trimmed[0], end);
+            if (existingInline.indexOf('\n') >= 0 || existingInline.indexOf('\r') >= 0)
+                throw EditError.unsupported("multiline inline Object insertion is unsupported");
+            String eol = detectEol(b, trimmed[1]);
+            int close = end - 1;
+            int[] trailing = Bytes.trim(b, trimmed[0] + 1, close);
+            int insertAt = trailing[1];
+            boolean trailingComma = insertAt > trimmed[0] + 1 && b[insertAt - 1] == ',';
+            int slashCount = 0;
+            if (trailingComma) {
+                for (int i = insertAt - 2; i >= trimmed[0] + 1 && b[i] == '\\'; i--) slashCount++;
+                trailingComma = (slashCount & 1) == 0;
+            }
+            boolean existingMembers = hasInlineMember(b, trimmed[0] + 1,
+                    trailingComma ? insertAt - 1 : close);
+            String inlinePair = encodeInsertKeySegment(key) + ": " + inlineBody(replacement, true);
+            int insertedAt;
+            String insertion;
+            int spliceTo;
+            if (!hasInlineMember(b, trimmed[0] + 1, close)) {
+                insertedAt = trimmed[0] + 1;
+                spliceTo = close;
+                insertion = inlinePair;
+            } else {
+                if (trailingComma) {
+                    insertedAt = insertAt;
+                    spliceTo = insertedAt;
+                    insertion = " " + inlinePair + ",";
+                } else {
+                    insertedAt = close;
+                    spliceTo = insertedAt;
+                    insertion = (existingMembers ? ", " : (hasInlineWhitespace(b, trimmed[0] + 1, close) ? " " : "")) + inlinePair;
+                }
+            }
+            result = Bytes.text(b, 0, insertedAt) + insertion
+                    + Bytes.text(b, spliceTo, b.length);
+            layoutFrom = insertedAt;
+            layoutTo = spliceTo;
+            layoutInserted = insertion.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            layoutEligible = true;
+        } else if (node.slot != null && node.slot.kind == EditTree.Slot.BLOCK) {
+            int closeLine = lineStart(b, node.slot.b1 - 1);
+            String indent = lineIndent(b, node.slot.b0);
+            String childIndent = siblingIndent(b, node);
+            if (childIndent == null) childIndent = indent + "    ";
+            String eol = detectEol(b, node.slot.b1);
+            String blockPair = standalonePair(key, replacement, childIndent, eol);
+            int insertAt = closeLine;
+            String prefix = insertAt > 0 && b[insertAt - 1] != '\n'
+                    && b[insertAt - 1] != '\r' ? eol : "";
+            result = Bytes.text(b, 0, insertAt) + prefix + childIndent + blockPair + eol
+                    + Bytes.text(b, insertAt, b.length);
+        } else if (parentPath.isEmpty() && tree.rootExplicit) {
+            int at = tree.rootClose;
+            if (at < bomStart || at >= b.length || b[at] != '}')
+                throw EditError.unsupported("explicit root Object has no recorded closing brace");
+            String childIndent = node.entries.isEmpty() ? "    " : siblingIndent(b, node);
+            if (childIndent == null) childIndent = "    ";
+            String eol = detectEol(b, at);
+            String blockPair = standalonePair(key, replacement, childIndent, eol);
+            int insertAt = lineStart(b, at);
+            if (insertAt < bomStart) insertAt = at;
+            String prefix = insertAt > bomStart && b[insertAt - 1] != '\n'
+                    && b[insertAt - 1] != '\r' ? eol : "";
+            result = Bytes.text(b, 0, insertAt) + prefix + childIndent + blockPair + eol
+                    + Bytes.text(b, insertAt, b.length);
+        } else {
+            int at = b.length;
+            String eol = detectEol(b, b.length);
+            String blockPair = standalonePair(key, replacement, "", eol);
+            boolean hasFinalEol = at > 0 && (b[at - 1] == '\n' || b[at - 1] == '\r');
+            String addition;
+            if (at == bomStart && bomStart > 0) {
+                addition = eol + blockPair;
+            } else if (at == 0) {
+                addition = blockPair;
+            } else if (hasFinalEol) {
+                addition = blockPair + eol;
+            } else {
+                addition = eol + blockPair;
+            }
+            result = Bytes.text(b, 0, at) + addition;
+        }
+
+        byte[] rb = result.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Value reparsed;
+        try { reparsed = PureParser.parse(rb, bomStart, false); }
+        catch (SourceError e) { throw EditError.unsupported("patch produced an invalid document: " + e.getMessage()); }
+        LinkedHashMap<String, Value> expectedMap = new LinkedHashMap<>(object.entries());
+        expectedMap.put(key, replacement);
+        Value expected = replaceAt(original, parentPath, new Value.Obj(expectedMap));
+        if (!expected.equals(reparsed)) throw EditError.unsupported("semantic mismatch after insertion");
+        if (layoutEligible) {
+            String adjusted;
+            try {
+                adjusted = Layout.adjust(b, result, tree.root, parentPath, replacement,
+                        layoutFrom, layoutTo, layoutInserted);
+            } catch (EditError layoutFailure) {
+                return result;
+            }
+            if (!adjusted.equals(result)) {
+                byte[] ab = adjusted.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                try {
+                    Value laidOut = PureParser.parse(ab, bomStart, false);
+                    if (expected.equals(laidOut)) result = adjusted;
+                } catch (SourceError ignored) {
+                    // Preserve the already-verified inline insertion candidate.
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean isInlineBody(byte[] b, int from, int to) {
+        int[] body = Bytes.trim(b, from, to);
+        return body[1] - body[0] >= 2 && b[body[0]] == '{' && b[body[1] - 1] == '}';
+    }
+
+    private static String standalonePair(String key, Value value, String indent, String eol) {
+        String encodedKey = encodeInsertKeySegment(key);
+        boolean compound = value instanceof Value.Obj || value instanceof Value.Arr;
+        boolean emptyCompound = value instanceof Value.Obj o && o.entries().isEmpty()
+                || value instanceof Value.Arr a && a.items().isEmpty();
+        if (!compound || emptyCompound) {
+            PlanCtx pc = new PlanCtx();
+            pc.slot = EditTree.Slot.PAIR;
+            pc.roleItemBlock = false;
+            pc.existingRaw = false;
+            pc.rootFirst = false;
+            pc.indent = indent;
+            pc.eol = eol;
+            pc.inlineCompound = false;
+            pc.blockCompound = true;
+            Planned planned = planValue(value, pc);
+            String marker = planned.desiredRaw ? "::" : ":";
+            return encodedKey + marker + " " + planned.body;
+        }
+        LinkedHashMap<String, Value> one = new LinkedHashMap<>();
+        one.put(key, value);
+        final String rendered;
+        try {
+            rendered = PureWriter.dumps(new Value.Obj(one));
+        } catch (KtavException e) {
+            throw EditError.unsupported("replacement is not representable: " + e.getMessage());
+        }
+        String normalized = rendered;
+        if (normalized.endsWith("\n")) normalized = normalized.substring(0, normalized.length() - 1);
+        String out = reindentInsert(normalized, indent, eol);
+        return out;
+    }
+
+    private static String siblingIndent(byte[] b, EditTree.Node node) {
+        if (node.kind != EditTree.Node.OBJECT || node.entries.isEmpty()) return null;
+        EditTree.Node last = null;
+        for (EditTree.Node child : node.entries.values()) last = child;
+        if (last == null || last.slot == null) return null;
+        int pos = last.slot.kind == EditTree.Slot.BLOCK ? last.slot.b0
+                : last.slot.kind == EditTree.Slot.PAIR ? last.slot.anchor : last.slot.anchor;
+        return lineIndent(b, pos);
+    }
+
+    private static Value replaceAt(Value root, List<String> path, Value value) {
+        if (path.isEmpty()) return value;
+        String head = path.get(0);
+        List<String> rest = path.subList(1, path.size());
+        if (root instanceof Value.Obj o) {
+            LinkedHashMap<String, Value> entries = new LinkedHashMap<>(o.entries());
+            Value child = entries.get(head);
+            if (child == null) throw EditError.notFound();
+            entries.put(head, replaceAt(child, rest, value));
+            return new Value.Obj(entries);
+        }
+        if (root instanceof Value.Arr a) {
+            int index = parseIndex(head);
+            if (index >= a.items().size()) throw EditError.notFound();
+            List<Value> items = new ArrayList<>(a.items());
+            items.set(index, replaceAt(items.get(index), rest, value));
+            return new Value.Arr(items);
+        }
+        throw EditError.notFound();
+    }
+
+    private static int lineStart(byte[] b, int pos) {
+        int i = Math.min(pos, b.length);
+        while (i > 0 && b[i - 1] != '\n' && b[i - 1] != '\r') i--;
+        return i;
+    }
+
+    private static boolean hasInlineWhitespace(byte[] b, int from, int to) {
+        for (int i = from; i < to; ) {
+            int cp = b[i] & 0xff;
+            int len = cp < 0x80 ? 1 : cp < 0xe0 ? 2 : cp < 0xf0 ? 3 : 4;
+            if (i + len > to) return false;
+            String unit = new String(b, i, len, java.nio.charset.StandardCharsets.UTF_8);
+            if (unit.codePointCount(0, unit.length()) != 1 || !isKtavWhitespace(unit.codePointAt(0))) return false;
+            i += len;
+        }
+        return to > from;
+    }
+
+    private static boolean isKtavWhitespace(int cp) {
+        return cp == 0x09 || cp == 0x0b || cp == 0x0c || cp == 0x20
+                || cp == 0x85 || cp == 0xa0 || cp == 0x1680
+                || cp >= 0x2000 && cp <= 0x200a || cp == 0x2028
+                || cp == 0x2029 || cp == 0x202f || cp == 0x205f
+                || cp == 0x3000;
+    }
+
+    private static boolean hasInlineMember(byte[] b, int from, int to) {
+        return Bytes.trim(b, from, to)[0] < Bytes.trim(b, from, to)[1];
+    }
     /**
      * Replace the value addressed by {@code segments} in validated
      * source {@code b} (whose grammar begins at {@code bomStart}) with
@@ -560,6 +828,13 @@ final class EditSplice {
         }
     }
 
+    private static String encodeInsertKeySegment(String key) {
+        if (key.isEmpty()) throw EditError.unsupported("empty key name is not representable");
+        StringBuilder out = new StringBuilder();
+        PureWriter.pushEscapedKeySegment(key, false, out);
+        return out.toString();
+    }
+
     /** § 5.9.10 key emission for inline compounds: bare, else quoted+escaped. */
     private static String encodeKeySegment(String key) {
         StringBuilder out = new StringBuilder();
@@ -1024,5 +1299,31 @@ final class EditSplice {
             i++;
         }
         return scanDecPart(s, i);
+    }
+
+    private static String reindentInsert(String doc, String indent, String eol) {
+        StringBuilder out = new StringBuilder(doc.length());
+        boolean inVerbatim = false;
+        String[] lines = doc.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            int leading = 0;
+            while (leading < line.length() && line.charAt(leading) == ' ') leading++;
+            String trimmed = line.substring(leading);
+            boolean closingMarker = inVerbatim && trim(line).equals("))");
+            boolean opens = !inVerbatim && trimmed.endsWith("((");
+            if (i > 0) out.append(eol);
+            if (closingMarker) {
+                out.append(indent).append(line);
+                inVerbatim = false;
+            } else if (inVerbatim) {
+                out.append(line);
+            } else {
+                if (i == 0) out.append(line);
+                else out.append(indent).append(line);
+                if (opens) inVerbatim = true;
+            }
+        }
+        return out.toString();
     }
 }
