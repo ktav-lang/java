@@ -12,6 +12,7 @@
     { "moduleLicense": "ISC" },
     { "moduleName": "org[.]junit([.].*)?:.*", "moduleLicense": "Eclipse Public License - v 2[.]0" },
     { "moduleName": "org[.]junit([.].*)?:.*", "moduleLicense": "Eclipse Public License v2[.]0" },
-    { "moduleName": "io[.]github[.]ktav-lang:lib", "moduleVersion": "0[.]8[.]1", "moduleLicense": "" }
+    { "moduleName": "io[.]github[.]ktav-lang:lib", "moduleVersion": "0[.]8[.]1", "moduleLicense": "" },
+    { "moduleName": "org[.]gradle[.]toolchains:foojay-resolver", "moduleVersion": "0[.]9[.]0", "moduleLicense": "" }
   ]
 }

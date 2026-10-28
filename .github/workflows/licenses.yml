@@ -53,5 +53,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Verify settings plugin and reviewed source license
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' 25feb033cedd1d724cdbe0dce5e8148f4734518e1db325b1b3c8b95ade92ef90 settings.gradle.kts | sha256sum --check
+          curl -fsSL https://plugins.gradle.org/m2/org/gradle/toolchains/foojay-resolver-convention/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin/0.9.0/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin-0.9.0.pom > "$RUNNER_TEMP/foojay-marker.pom"
+          printf '%s  %s\n' db7cf11bee6884efb28904139f62c00f8b45853e60c0f41715cf69576b6bfdf0 "$RUNNER_TEMP/foojay-marker.pom" | sha256sum --check
+          curl -fsSL https://raw.githubusercontent.com/gradle/foojay-toolchains/f4575ddf844fcfd4ad9e758d2040cfd50b59f173/LICENSE > "$RUNNER_TEMP/foojay-LICENSE"
+          printf '%s  %s\n' c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4 "$RUNNER_TEMP/foojay-LICENSE" | sha256sum --check
       - name: Check all Gradle configurations and buildscript dependencies
         run: ./gradlew --no-daemon --no-parallel -I ci/license-init.gradle checkLicense

@@ -8,6 +8,16 @@ initscript {
     }
 }
 
+gradle.beforeProject { project ->
+    if (project == project.rootProject) {
+        project.buildscript.repositories {
+            mavenCentral()
+            gradlePluginPortal()
+        }
+        project.buildscript.dependencies.add("classpath", "org.gradle.toolchains:foojay-resolver:0.9.0")
+    }
+}
+
 gradle.projectsEvaluated {
     def root = gradle.rootProject
     root.pluginManager.apply(com.github.jk1.license.LicenseReportPlugin)
@@ -19,6 +29,12 @@ gradle.projectsEvaluated {
 
     def guard = root.tasks.register("licenseDependencyBoundaries") {
         doLast {
+            def foojay = root.buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts.findAll {
+                it.moduleVersion.id.group == "org.gradle.toolchains" && it.name == "foojay-resolver" && it.moduleVersion.id.version == "0.9.0"
+            }
+            if (foojay.size() != 1) throw new GradleException("Expected exactly one Foojay resolver artifact")
+            def digest = java.security.MessageDigest.getInstance("SHA-256").digest(foojay[0].file.bytes).encodeHex().toString()
+            if (digest != "c284089a3f87557f76022d99f2df2836568aa48b3fe4e2922392d566ba814176") throw new GradleException("Foojay resolver artifact changed")
             def testConfigurations = ["testCompileClasspath", "testRuntimeClasspath", "testAnnotationProcessor"] as Set
             def forbidden = { group, module, configuration ->
                 (group == "io.github.ktav-lang" && module == "lib") ||
