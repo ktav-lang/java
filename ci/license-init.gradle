@@ -57,5 +57,14 @@ gradle.projectsEvaluated {
             }
         }
     }
-    root.tasks.named("checkLicense") { dependsOn(guard) }
+    root.tasks.named("checkLicense") {
+        dependsOn(guard)
+        doLast {
+            def data = new groovy.json.JsonSlurper().parse(new File(report.absoluteOutputDir, "project-licenses-for-check-license-task.json"))
+            def names = data.dependencies.collect { it.moduleName }
+            if (!names.contains("org.gradle.toolchains:foojay-resolver") || !names.contains("com.google.code.gson:gson")) {
+                throw new GradleException("Foojay resolver and its transitive Gson dependency must be in the license report")
+            }
+        }
+    }
 }
