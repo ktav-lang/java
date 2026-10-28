@@ -16,4 +16,29 @@ gradle.projectsEvaluated {
     report.buildScriptProjects = ([root] + root.subprojects) as org.gradle.api.Project[]
     report.excludeOwnGroup = false
     report.allowedLicensesFile = root.file("ci/allowed-licenses.json")
+
+    def guard = root.tasks.register("licenseDependencyBoundaries") {
+        doLast {
+            def forbidden = { group, module, testConfiguration ->
+                (group == "io.github.ktav-lang" && module == "lib") ||
+                    (!testConfiguration && (group == "org.junit" || group.startsWith("org.junit.")))
+            }
+            assert forbidden("org.junit.jupiter", "junit-jupiter", false)
+            assert !forbidden("org.junit.jupiter", "junit-jupiter", true)
+            assert forbidden("io.github.ktav-lang", "lib", true)
+            assert !forbidden("org.example", "library", false)
+            root.allprojects.each { project ->
+                project.configurations.findAll { it.canBeResolved }.each { configuration ->
+                    boolean testConfiguration = configuration.name.toLowerCase(java.util.Locale.ROOT).contains("test")
+                    configuration.incoming.resolutionResult.allComponents.each { component ->
+                        def id = component.id
+                        if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier && forbidden(id.group, id.module, testConfiguration)) {
+                            throw new GradleException("Unexpected non-test or external dependency ${id} in ${project.path}:${configuration.name}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    root.tasks.named("checkLicense") { dependsOn(guard) }
 }
