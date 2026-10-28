@@ -1,0 +1,19 @@
+initscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "com.github.jk1:gradle-license-report:3.1.4"
+    }
+}
+
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.pluginManager.apply(com.github.jk1.license.LicenseReportPlugin)
+    def report = root.extensions.getByType(com.github.jk1.license.LicenseReportExtension)
+    report.configurations = com.github.jk1.license.LicenseReportExtension.ALL
+    report.buildScriptProjects = ([root] + root.subprojects) as org.gradle.api.Project[]
+    report.excludeOwnGroup = false
+    report.allowedLicensesFile = root.file("ci/allowed-licenses.json")
+}
