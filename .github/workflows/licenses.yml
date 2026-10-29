@@ -9,6 +9,70 @@ permissions:
   contents: read
 
 jobs:
+  native-notices:
+    name: Embedded native third-party notices
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rust-docs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Resolve the existing development graph
+        run: cargo generate-lockfile
+      - name: Prepare source-backed Cargo and Rust std notices
+        shell: python
+        run: |
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'java-native-notices'
+          subprocess.run([sys.executable, 'scripts/prepare_cabi_notices.py', str(evidence)], check=True)
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as output:
+              output.write(f'KTAV_NATIVE_NOTICES={(evidence / "NOTICE.json.gz").as_posix()}\n')
+      - name: Test embedded resource guards
+        run: python -m unittest discover -s ci -p test_embedded_notices.py -v
+      - name: Build native library with embedded notices
+        run: cargo build --release --locked -p ktav-cabi
+      - name: Verify exact notices survive linking and stripping
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'java-native-notices'
+          binary = Path('target/release/libktav_cabi.so')
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
+              raise SystemExit('Cargo.lock changed after notice generation')
+          report = subprocess.check_output([
+              sys.executable, 'scripts/check_embedded_notices.py', str(binary), str(evidence / 'NOTICE.json'),
+          ])
+          (evidence / 'libktav_cabi.so.NOTICE.manifest.json').write_bytes(report)
+          shutil.copy2(binary, evidence / binary.name)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run Java tests against the metadata-bearing library
+        run: ./gradlew :lib:test --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: java-native-notice-evidence
+          path: ${{ runner.temp }}/java-native-notices/
+          if-no-files-found: warn
+
   cargo-licenses:
     name: Cargo dependency licenses
     runs-on: ubuntu-latest
