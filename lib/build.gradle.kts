@@ -131,7 +131,7 @@ mavenPublishing {
     }
 }
 
-tasks.named<Jar>("mavenPlainJavadocJar") {
+tasks.named<org.gradle.jvm.tasks.Jar>("mavenPlainJavadocJar") {
     into("META-INF") {
         from(rootProject.file("LICENSE-MIT"), rootProject.file("LICENSE-APACHE"))
     }
