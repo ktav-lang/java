@@ -197,7 +197,7 @@ jobs:
         run: |
           set -euo pipefail
           zig version > "$RUNNER_TEMP/native-notices/zig-version.txt"
-          cargo zigbuild --version > "$RUNNER_TEMP/native-notices/cargo-zigbuild-version.txt"
+          sha256sum "$(command -v cargo-zigbuild)" > "$RUNNER_TEMP/native-notices/cargo-zigbuild.sha256"
           RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-Wl,-Map=$RUNNER_TEMP/native-notices/native-link.map" \
             cargo zigbuild --locked --release -p ktav-cabi --target ${{ matrix.settings.target }}.2.17
           test -s "$RUNNER_TEMP/native-notices/native-link.map"
