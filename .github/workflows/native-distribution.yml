@@ -193,7 +193,14 @@ jobs:
         run: python -m unittest discover -s ci -p test_embedded_notices.py -v
       - name: Build (zigbuild)
         if: matrix.settings.use-zigbuild
-        run: cargo zigbuild --locked --release -p ktav-cabi --target ${{ matrix.settings.target }}.2.17
+        shell: bash
+        run: |
+          set -euo pipefail
+          zig version > "$RUNNER_TEMP/native-notices/zig-version.txt"
+          cargo zigbuild --version > "$RUNNER_TEMP/native-notices/cargo-zigbuild-version.txt"
+          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-Wl,-Map=$RUNNER_TEMP/native-notices/native-link.map" \
+            cargo zigbuild --locked --release -p ktav-cabi --target ${{ matrix.settings.target }}.2.17
+          test -s "$RUNNER_TEMP/native-notices/native-link.map"
 
       - name: Build (native)
         if: ${{ !matrix.settings.use-zigbuild }}
