@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Validate native distribution and publication gates
+        run: ruby ci/check_native_distribution.rb
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rust-docs

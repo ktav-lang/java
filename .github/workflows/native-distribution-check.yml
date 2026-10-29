@@ -1,0 +1,13 @@
+name: Native distribution license checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-distribution:
+    uses: ./.github/workflows/native-distribution.yml
+    with:
+      source-ref: b252ccfaed66505952ad63a99663e8b6ff530d62
