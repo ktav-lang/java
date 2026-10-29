@@ -1,0 +1,153 @@
+name: License checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-notices:
+    name: Embedded native third-party notices
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Validate native distribution and publication gates
+        run: ruby ci/check_native_distribution.rb
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rust-docs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Resolve the existing development graph
+        run: cargo generate-lockfile
+      - name: Prepare source-backed Cargo and Rust std notices
+        shell: python
+        run: |
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'java-native-notices'
+          subprocess.run([sys.executable, 'scripts/prepare_cabi_notices.py', str(evidence)], check=True)
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as output:
+              output.write(f'KTAV_NATIVE_NOTICES={(evidence / "NOTICE.json.gz").as_posix()}\n')
+      - name: Test embedded resource guards
+        run: python -m unittest discover -s ci -p test_embedded_notices.py -v
+      - name: Build native library with embedded notices
+        run: cargo build --release --locked -p ktav-cabi
+      - name: Verify exact notices survive linking and stripping
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'java-native-notices'
+          binary = Path('target/release/libktav_cabi.so')
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
+              raise SystemExit('Cargo.lock changed after notice generation')
+          report = subprocess.check_output([
+              sys.executable, 'scripts/check_embedded_notices.py', str(binary), str(evidence / 'NOTICE.json'),
+          ])
+          (evidence / 'libktav_cabi.so.NOTICE.manifest.json').write_bytes(report)
+          shutil.copy2(binary, evidence / binary.name)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run Java tests against the metadata-bearing library
+        run: ./gradlew :lib:test --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: java-native-notice-evidence
+          path: ${{ runner.temp }}/java-native-notices/
+          if-no-files-found: warn
+
+  cargo-licenses:
+    name: Cargo dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@b66acf5e9fe20f8aba065be86778a8a4c846f902
+        with:
+          command: check licenses
+
+  npm-licenses:
+    name: npm dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm ci --ignore-scripts
+      - name: Check npm lockfile
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const allowed = new Set(["MIT", "Apache-2.0", "MIT OR Apache-2.0", "Apache-2.0 OR MIT"]);
+          function check(lock) {
+            if (lock?.lockfileVersion !== 3 || !lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages) || !lock.packages[""]) throw new Error("Invalid npm lockfile");
+            return Object.entries(lock.packages).filter(([path, pkg]) => path !== "" && !allowed.has(pkg?.license)).map(([path, pkg]) => `${path}: ${JSON.stringify(pkg?.license)}`);
+          }
+          assert.equal(check({ lockfileVersion: 3, packages: { "": {}, x: { license: "MIT AND GPL-3.0-only" } } }).length, 1);
+          assert.equal(check({ lockfileVersion: 3, packages: { "": {}, x: {} } }).length, 1);
+          assert.equal(check({ lockfileVersion: 3, packages: { "": {}, x: { license: "MIT" } } }).length, 0);
+          const failures = check(JSON.parse(readFileSync("package-lock.json", "utf8")));
+          if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
+          NODE
+
+  gradle-licenses:
+    name: Gradle dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Verify settings plugin and reviewed source license
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' 25feb033cedd1d724cdbe0dce5e8148f4734518e1db325b1b3c8b95ade92ef90 settings.gradle.kts | sha256sum --check
+          curl -fsSL https://plugins.gradle.org/m2/org/gradle/toolchains/foojay-resolver-convention/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin/0.9.0/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin-0.9.0.pom > "$RUNNER_TEMP/foojay-marker.pom"
+          printf '%s  %s\n' db7cf11bee6884efb28904139f62c00f8b45853e60c0f41715cf69576b6bfdf0 "$RUNNER_TEMP/foojay-marker.pom" | sha256sum --check
+          curl -fsSL https://raw.githubusercontent.com/gradle/foojay-toolchains/f4575ddf844fcfd4ad9e758d2040cfd50b59f173/LICENSE > "$RUNNER_TEMP/foojay-LICENSE"
+          printf '%s  %s\n' c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4 "$RUNNER_TEMP/foojay-LICENSE" | sha256sum --check
+      - name: Check all Gradle configurations and buildscript dependencies
+        run: ./gradlew --no-daemon --no-parallel -I ci/license-init.gradle checkLicense
+      - name: Build JARs and verify license files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :lib:jar :lib:sourcesJar :lib:mavenPlainJavadocJar
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          jars = list(Path('lib/build/libs').glob('*.jar'))
+          main = [p for p in jars if not p.name.endswith(('-sources.jar', '-javadoc.jar', '-pure-check.jar'))]
+          sources = [p for p in jars if p.name.endswith('-sources.jar')]
+          javadoc = [p for p in jars if p.name.endswith('-javadoc.jar')]
+          if len(main) != 1 or len(sources) != 1 or len(javadoc) != 1:
+              raise SystemExit(f'expected one main, one sources and one javadoc JAR: {jars!r}')
+          for jar in main + sources + javadoc:
+              with zipfile.ZipFile(jar) as archive:
+                  for license_name in ('LICENSE-MIT', 'LICENSE-APACHE'):
+                      entry = f'META-INF/{license_name}'
+                      if archive.namelist().count(entry) != 1 or archive.read(entry) != Path(license_name).read_bytes():
+                          raise SystemExit(f'{jar}: missing, duplicate or incorrect {entry}')
+          PY
