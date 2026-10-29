@@ -115,10 +115,7 @@ jobs:
           original = source.read_bytes()
           hook = b'include!(concat!(env!("OUT_DIR"), "/native_notices.rs"));'
           if hook not in original:
-              source.write_bytes(original + b'
-
-' + hook + b'
-')
+              source.write_bytes(original + bytes([10, 10]) + hook + bytes([10]))
           elif original.count(hook) != 1:
               raise SystemExit('duplicate native notice include')
           provenance = {
