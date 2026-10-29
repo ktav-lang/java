@@ -64,7 +64,7 @@ tasks.named("assemble") {
 }
 
 tasks.withType<Jar>().configureEach {
-    if (name == "jar" || name == "sourcesJar") {
+    if (name == "jar" || name == "sourcesJar" || name == "mavenPlainJavadocJar") {
         into("META-INF") {
             from(rootProject.file("LICENSE-MIT"), rootProject.file("LICENSE-APACHE"))
         }

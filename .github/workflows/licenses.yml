@@ -67,17 +67,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :lib:jar :lib:sourcesJar
+          ./gradlew --no-daemon :lib:jar :lib:sourcesJar :lib:mavenPlainJavadocJar
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
 
-          jars = list(Path('lib/build/libs').glob('ktav-*.jar'))
+          jars = list(Path('lib/build/libs').glob('*.jar'))
           main = [p for p in jars if not p.name.endswith(('-sources.jar', '-javadoc.jar', '-pure-check.jar'))]
           sources = [p for p in jars if p.name.endswith('-sources.jar')]
-          if len(main) != 1 or len(sources) != 1:
-              raise SystemExit(f'expected one main and one sources JAR: {jars!r}')
-          for jar in main + sources:
+          javadoc = [p for p in jars if p.name.endswith('-javadoc.jar')]
+          if len(main) != 1 or len(sources) != 1 or len(javadoc) != 1:
+              raise SystemExit(f'expected one main, one sources and one javadoc JAR: {jars!r}')
+          for jar in main + sources + javadoc:
               with zipfile.ZipFile(jar) as archive:
                   for license_name in ('LICENSE-MIT', 'LICENSE-APACHE'):
                       entry = f'META-INF/{license_name}'
