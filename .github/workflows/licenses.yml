@@ -63,3 +63,24 @@ jobs:
           printf '%s  %s\n' c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4 "$RUNNER_TEMP/foojay-LICENSE" | sha256sum --check
       - name: Check all Gradle configurations and buildscript dependencies
         run: ./gradlew --no-daemon --no-parallel -I ci/license-init.gradle checkLicense
+      - name: Build JARs and verify license files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon :lib:jar :lib:sourcesJar
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          jars = list(Path('lib/build/libs').glob('ktav-*.jar'))
+          main = [p for p in jars if not p.name.endswith(('-sources.jar', '-javadoc.jar', '-pure-check.jar'))]
+          sources = [p for p in jars if p.name.endswith('-sources.jar')]
+          if len(main) != 1 or len(sources) != 1:
+              raise SystemExit(f'expected one main and one sources JAR: {jars!r}')
+          for jar in main + sources:
+              with zipfile.ZipFile(jar) as archive:
+                  for license_name in ('LICENSE-MIT', 'LICENSE-APACHE'):
+                      entry = f'META-INF/{license_name}'
+                      if archive.namelist().count(entry) != 1 or archive.read(entry) != Path(license_name).read_bytes():
+                          raise SystemExit(f'{jar}: missing, duplicate or incorrect {entry}')
+          PY

@@ -63,6 +63,14 @@ tasks.named("assemble") {
     dependsOn(pureCheckJar)
 }
 
+tasks.withType<Jar>().configureEach {
+    if (name == "jar" || name == "sourcesJar") {
+        into("META-INF") {
+            from(rootProject.file("LICENSE-MIT"), rootProject.file("LICENSE-APACHE"))
+        }
+    }
+}
+
 tasks.named<Jar>("jar") {
     manifest {
         attributes(
