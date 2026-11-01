@@ -17,7 +17,9 @@ jobs:
         with:
           submodules: recursive
       - name: Validate native distribution and publication gates
-        run: ruby ci/check_native_distribution.rb
+        run: |
+          ruby ci/check_native_distribution.rb
+          python -I -m unittest discover -s ci -p test_native_distribution_contract.py -v
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rust-docs
