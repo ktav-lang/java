@@ -535,6 +535,19 @@ implementation("io.github.ktav-lang:ktav:0.8.1") { isTransitive = false }
 - Линукс-дистрибутивы должны использовать glibc 2.17+ (дефолтная цель
   Rust). Поддержка Alpine (musl) — запланирована.
 
+
+Подготовленная Windows native distribution 0.8.1 использует GNU/LLVM targets
+`x86_64-pc-windows-gnullvm` и `aarch64-pc-windows-gnullvm`.
+Прежние имена assets `windows-amd64` и `windows-arm64` сохраняются как
+идентификаторы совместимости, а не как указание на компилятор MSVC.
+Во время работы этим DLL не нужны инструменты сборки Rust/LLVM или
+`VCRUNTIME140.dll`: используются системные Windows API и UCRT.
+Зависимости Java не изменены. Полные исходные copyright и лицензионные
+тексты compiler/runtime встроены в DLL и сохранены в соседнем
+`.NOTICE.json`; распространяйте notice и `.NOTICE.manifest.json` вместе
+с DLL. Это описание подготовленного candidate, а не исправление ранее
+опубликованных бинарников.
+
 ## Лицензия
 
 MIT OR Apache-2.0 — см. [LICENSE-MIT](../../LICENSE-MIT) и [LICENSE-APACHE](../../LICENSE-APACHE).
