@@ -510,7 +510,7 @@ jobs:
           subprocess.run(['node', 'scripts/build-docs.mjs'], check=True)
           subprocess.run(['node', 'scripts/build-docs.mjs', '--check'], check=True)
           changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
-          names = ['README.md', 'README.ru.md', 'README.zh.md']
+          names = ['README.md', 'docs/ru/README.ru.md', 'docs/zh/README.zh.md']
           if changed != {str(unit), *names}:
               raise SystemExit('documentation proposal changed unrelated files')
           output = Path(os.environ['RUNNER_TEMP']) / 'java-gnu-doc-proposal'
@@ -518,7 +518,9 @@ jobs:
           rows = []
           for name in names:
               raw = Path(name).read_bytes()
-              (output / name).write_bytes(raw)
+              destination = output / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_bytes(raw)
               rows.append({'path': name, 'sha256': hashlib.sha256(raw).hexdigest()})
           record = {'tooling_ref': os.environ['GITHUB_SHA'], 'source_unit_sha256': hashlib.sha256(unit.read_bytes()).hexdigest(), 'files': rows}
           (output / 'source-provenance.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
