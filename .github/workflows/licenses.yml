@@ -41,7 +41,9 @@ jobs:
           with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as output:
               output.write(f'KTAV_NATIVE_NOTICES={(evidence / "NOTICE.json.gz").as_posix()}\n')
       - name: Test embedded resource guards
-        run: python -m unittest discover -s ci -p test_embedded_notices.py -v
+        run: |
+          python -m unittest discover -s ci -p test_embedded_notices.py -v
+          python -I -m unittest discover -s ci -p test_rust_compiler_notices.py -v
       - name: Build native library with embedded notices
         run: cargo build --release --locked -p ktav-cabi
       - name: Verify exact notices survive linking and stripping
