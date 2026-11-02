@@ -501,6 +501,17 @@ Maven 请同时排除 `net.java.dev.jna:jna` 和 `com.fasterxml.jackson.core:jac
 - Linux 发行版需使用 glibc 2.17+(Rust 默认目标)。Alpine
   (musl)支持已规划。
 
+
+准备中的 0.8.1 Windows 原生发行包使用 GNU/LLVM 目标
+`x86_64-pc-windows-gnullvm` 和 `aarch64-pc-windows-gnullvm`。
+现有的 `windows-amd64`、`windows-arm64` 文件名保留为兼容性标识，
+并不表示使用 MSVC 编译。这些 DLL 在运行时不需要 Rust/LLVM 构建工具
+或 `VCRUNTIME140.dll`，而是使用 Windows 系统 API 和系统 UCRT。
+Java 依赖保持不变。完整的编译器及运行时原始版权和许可证文本嵌入 DLL，
+并保留在相邻的 `.NOTICE.json` 中；分发 DLL 时也应保留 notice 和
+`.NOTICE.manifest.json`。此说明仅适用于准备中的候选发行包，
+不表示已修复先前发布的二进制文件。
+
 ## 许可证
 
 MIT OR Apache-2.0 —— 见 [LICENSE-MIT](../../LICENSE-MIT) 和 [LICENSE-APACHE](../../LICENSE-APACHE)。

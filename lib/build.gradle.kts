@@ -63,6 +63,14 @@ tasks.named("assemble") {
     dependsOn(pureCheckJar)
 }
 
+tasks.withType<Jar>().configureEach {
+    if (name == "jar" || name == "sourcesJar") {
+        into("META-INF") {
+            from(rootProject.file("LICENSE-MIT"), rootProject.file("LICENSE-APACHE"))
+        }
+    }
+}
+
 tasks.named<Jar>("jar") {
     manifest {
         attributes(
@@ -120,5 +128,11 @@ mavenPublishing {
             connection.set("scm:git:git://github.com/ktav-lang/java.git")
             developerConnection.set("scm:git:ssh://git@github.com/ktav-lang/java.git")
         }
+    }
+}
+
+tasks.named<org.gradle.jvm.tasks.Jar>("mavenPlainJavadocJar") {
+    into("META-INF") {
+        from(rootProject.file("LICENSE-MIT"), rootProject.file("LICENSE-APACHE"))
     }
 }

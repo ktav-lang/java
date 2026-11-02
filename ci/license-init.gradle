@@ -1,0 +1,70 @@
+initscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "com.github.jk1:gradle-license-report:3.1.4"
+    }
+}
+
+gradle.beforeProject { project ->
+    if (project == project.rootProject) {
+        project.buildscript.repositories {
+            mavenCentral()
+            gradlePluginPortal()
+        }
+        project.buildscript.dependencies.add("classpath", "org.gradle.toolchains:foojay-resolver:0.9.0")
+    }
+}
+
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.pluginManager.apply(com.github.jk1.license.LicenseReportPlugin)
+    def report = root.extensions.getByType(com.github.jk1.license.LicenseReportExtension)
+    report.configurations = com.github.jk1.license.LicenseReportExtension.ALL
+    report.buildScriptProjects = ([root] + root.subprojects) as org.gradle.api.Project[]
+    report.excludeOwnGroup = false
+    report.allowedLicensesFile = root.file("ci/allowed-licenses.json")
+
+    def guard = root.tasks.register("licenseDependencyBoundaries") {
+        doLast {
+            def foojay = root.buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts.findAll {
+                it.moduleVersion.id.group == "org.gradle.toolchains" && it.name == "foojay-resolver" && it.moduleVersion.id.version == "0.9.0"
+            }
+            if (foojay.size() != 1) throw new GradleException("Expected exactly one Foojay resolver artifact")
+            def digest = java.security.MessageDigest.getInstance("SHA-256").digest(foojay[0].file.bytes).encodeHex().toString()
+            if (digest != "c284089a3f87557f76022d99f2df2836568aa48b3fe4e2922392d566ba814176") throw new GradleException("Foojay resolver artifact changed")
+            def testConfigurations = ["testCompileClasspath", "testRuntimeClasspath", "testAnnotationProcessor"] as Set
+            def forbidden = { group, module, configuration ->
+                (group == "io.github.ktav-lang" && module == "lib") ||
+                    (!testConfigurations.contains(configuration) && (group == "org.junit" || group.startsWith("org.junit.")))
+            }
+            assert forbidden("org.junit.jupiter", "junit-jupiter", "runtimeClasspath")
+            assert forbidden("org.junit.jupiter", "junit-jupiter", "contestRuntimeClasspath")
+            assert !forbidden("org.junit.jupiter", "junit-jupiter", "testRuntimeClasspath")
+            assert forbidden("io.github.ktav-lang", "lib", "testRuntimeClasspath")
+            assert !forbidden("org.example", "library", "runtimeClasspath")
+            root.allprojects.each { project ->
+                project.configurations.findAll { it.canBeResolved }.each { configuration ->
+                    configuration.incoming.resolutionResult.allComponents.each { component ->
+                        def id = component.id
+                        if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier && forbidden(id.group, id.module, configuration.name)) {
+                            throw new GradleException("Unexpected non-test or external dependency ${id} in ${project.path}:${configuration.name}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    root.tasks.named("checkLicense") {
+        dependsOn(guard)
+        doLast {
+            def data = new groovy.json.JsonSlurper().parse(new File(report.absoluteOutputDir, "project-licenses-for-check-license-task.json"))
+            def names = data.dependencies.collect { it.moduleName }
+            if (!names.contains("org.gradle.toolchains:foojay-resolver") || !names.contains("com.google.code.gson:gson")) {
+                throw new GradleException("Foojay resolver and its transitive Gson dependency must be in the license report")
+            }
+        }
+    }
+}

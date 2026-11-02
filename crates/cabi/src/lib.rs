@@ -22,5 +22,9 @@
 //! exactly once, with the length it was returned with. Return code is
 //! `0` on success, `1` on error, with `out_err` holding the JSON error
 //! envelope.
+//!
+//! Дополнительные license metadata статичны и не освобождаются через `ktav_free`.
 
 ktav::declare_cabi!();
+
+include!(concat!(env!("OUT_DIR"), "/native_notices.rs"));
